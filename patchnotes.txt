@@ -1,4 +1,2 @@
-- Deleting a user now asks in a clean in-app box instead of a Windows pop-up
-- Remember me signs you straight in with no sign-in screen flash
-- Remember me is more reliable after an update
-- Fixed the tick box and the warning icon so they are centred and crisp
+- The app now works with just the exe: no server settings screen and no extra files needed
+- Updates are found automatically on a fresh download

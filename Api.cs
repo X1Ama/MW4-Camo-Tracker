@@ -15,6 +15,11 @@ public sealed class ServerConfig
     public string UpdateUrl { get; set; } = "";
     public bool RememberMe { get; set; }
 
+    // The project address and public (anon) key are not secrets: they ship inside every copy so nobody has to enter them.
+    const string DefaultUrl = "https://bhohinvgodxqqfwvwkwx.supabase.co";
+    const string DefaultKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJob2hpbnZnb2R4cXFmd3Z3a3d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MjkxMTgsImV4cCI6MjEwNzUwNTExOH0.habPV-X7flnYfmsKQc7upNG6EqlJqtfwXChVypt8-2o";
+    const string DefaultUpdateUrl = "https://github.com/X1Ama/MW4-Camo-Tracker/releases/latest/download/update.json";
+
     static string AppDataPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MasteryTracker", "server.json");
     static string ExePath => Path.Combine(AppContext.BaseDirectory, "server.json");
@@ -24,7 +29,7 @@ public sealed class ServerConfig
     /// <summary>server.json next to the exe is the default shipped to clients; the AppData copy holds what the user typed.</summary>
     public static ServerConfig Load()
     {
-        var result = new ServerConfig();
+        var result = new ServerConfig { Url = DefaultUrl, AnonKey = DefaultKey, UpdateUrl = DefaultUpdateUrl };
         foreach (var path in new[] { ExePath, AppDataPath })
         {
             try

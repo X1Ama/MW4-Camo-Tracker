@@ -57,7 +57,7 @@ public partial class MainWindow : Window
             if (api == null) return;
             // Fast safety-net polling until the server confirms live updates are working.
             bool idle = !IsActive || WindowState == WindowState.Minimized;
-            timer.Interval = TimeSpan.FromSeconds(liveInstant ? (idle ? 120 : 30) : (idle ? 10 : 2));
+            timer.Interval = TimeSpan.FromSeconds(liveInstant ? (idle ? 60 : 8) : (idle ? 10 : 2));
             if (inflight == 0) await RefreshAsync();
         };
         searchDebounce.Tick += (_, _) => { searchDebounce.Stop(); Render(); };

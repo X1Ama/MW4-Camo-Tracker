@@ -1,2 +1,2 @@
-- The app now works with just the exe: no server settings screen and no extra files needed
-- Updates are found automatically on a fresh download
+- Un-ticking a camo now shows up on other screens instantly
+- Faster background checking as a safety net

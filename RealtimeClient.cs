@@ -101,7 +101,14 @@ public sealed class RealtimeClient : IDisposable
 
         var topic = "realtime:tracker-" + id;
         var token = await tokenProvider() ?? anonKey;
-        var changes = Tables.Select(t => new { @event = "*", schema = "public", table = t, filter = "client_id=eq." + id }).ToArray();
+        // Supabase cannot filter DELETE events (unticking a camo deletes a row), so deletes are listened for on
+        // every table without a filter. They carry no data: the app just re-reads the watched client.
+        var changes = new List<object>();
+        foreach (var t in Tables)
+        {
+            changes.Add(new { @event = "*", schema = "public", table = t, filter = "client_id=eq." + id });
+            changes.Add(new { @event = "DELETE", schema = "public", table = t });
+        }
         // custom_weapons is keyed by its own id, so it filters on client_id too (needs replica identity full for deletes)
         var r = NextRef();
         await SendAsync(sock, new
@@ -114,7 +121,7 @@ public sealed class RealtimeClient : IDisposable
                 {
                     broadcast = new { ack = false, self = false },
                     presence = new { key = "" },
-                    postgres_changes = changes,
+                    postgres_changes = changes.ToArray(),
                 },
                 access_token = token,
             },

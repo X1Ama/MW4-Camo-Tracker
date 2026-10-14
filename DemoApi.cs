@@ -6,6 +6,7 @@ namespace MasteryTracker;
 /// </summary>
 public sealed class DemoApi : Api
 {
+    public static readonly Profile Client = new("u-hoodie", "hoodie" + Catalog.UserDomain, "Hoodie", "client");
     public static readonly Profile Owner = new("u-owner", "demo-owner" + Catalog.UserDomain, "Demo Owner", "owner");
 
     readonly List<Profile> people = new()
@@ -31,6 +32,14 @@ public sealed class DemoApi : Api
         Data("u-konsti").Levels["finn-lmg"] = 7;
     }
 
+    public override bool SupportsRealtime => false;
+
+    public override Task ChangePasswordAsync(string email, string currentPassword, string newPassword)
+    {
+        if (currentPassword == newPassword) throw new ApiException(400, "same password");
+        return Task.CompletedTask; // the demo accepts any current password and saves nothing
+    }
+
     ClientData Data(string id) => store.TryGetValue(id, out var d) ? d : store[id] = new ClientData();
 
     public override Task<List<Profile>> GetManagedClientsAsync() =>
@@ -40,7 +49,7 @@ public sealed class DemoApi : Api
 
     public override Task<List<(string AdminId, string ClientId)>> GetAssignmentsAsync() => Task.FromResult(links.ToList());
 
-    public override Task LoadAsync(string clientId, ClientData into)
+    public override Task LoadAsync(string clientId, ClientData into, string? only = null)
     {
         var d = Data(clientId);
         into.Ticks.Clear(); into.Levels.Clear(); into.Classes.Clear(); into.Customs.Clear();

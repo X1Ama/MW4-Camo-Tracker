@@ -3,8 +3,9 @@ namespace MasteryTracker;
 public sealed record Mode(string Id, string Name, bool Track, string[] Camos);
 public sealed record Profile(string Id, string Email, string DisplayName, string Role)
 {
-    public string Label => string.IsNullOrWhiteSpace(DisplayName) ? Email.Replace(Catalog.UserDomain, "") : DisplayName;
+    public string Label => Catalog.Cap(string.IsNullOrWhiteSpace(DisplayName) ? Email.Replace(Catalog.UserDomain, "") : DisplayName);
     public bool IsStaff => Role is "admin" or "owner";
+    public string RoleLabel => Catalog.RoleLabel(Role);
 }
 public sealed record CustomWeapon(string Id, string Name, string Cls);
 
@@ -21,6 +22,19 @@ public static class Catalog
         ("ar", "Assault rifles"), ("smg", "SMGs"), ("sg", "Shotguns"), ("lmg", "LMGs"),
         ("mm", "Marksman rifles"), ("sn", "Sniper rifles"), ("pi", "Pistols"), ("la", "Launchers"), ("me", "Melee"),
     };
+
+    /// <summary>Names shown on screen. The stored role values stay client, admin and owner.</summary>
+    public static string RoleLabel(string role) => role switch
+    {
+        "admin" => "Grinder",
+        "owner" => "Owner",
+        "client" => "Client",
+        _ => role.Length == 0 ? role : char.ToUpperInvariant(role[0]) + role[1..],
+    };
+
+    /// <summary>First letter upper case, the rest left as typed ("konsti" becomes "Konsti").</summary>
+    public static string Cap(string s) =>
+        string.IsNullOrEmpty(s) ? s : char.ToUpperInvariant(s[0]) + s[1..];
 
     public static string ClassName(string code) =>
         Classes.FirstOrDefault(c => c.Code == code).Name ?? "Unsorted";

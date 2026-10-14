@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -64,6 +65,14 @@ public sealed class ClientData
     public Dictionary<string, string> Classes { get; } = new();
     public List<CustomWeapon> Customs { get; } = new();
 
+    public void CopyFrom(ClientData o)
+    {
+        Ticks.Clear(); foreach (var t in o.Ticks) Ticks.Add(t);
+        Levels.Clear(); foreach (var kv in o.Levels) Levels[kv.Key] = kv.Value;
+        Classes.Clear(); foreach (var kv in o.Classes) Classes[kv.Key] = kv.Value;
+        Customs.Clear(); Customs.AddRange(o.Customs);
+    }
+
     public string Signature()
     {
         var sb = new StringBuilder();
@@ -81,12 +90,29 @@ public sealed class ClientData
 /// <summary>Thin Supabase client: email/password sign-in plus PostgREST calls. No webview, plain HTTPS.</summary>
 public class Api
 {
-    readonly HttpClient http = new() { Timeout = TimeSpan.FromSeconds(20) };
+    // gzip/brotli responses and pooled connections: smaller downloads, fewer handshakes
+    readonly HttpClient http = new(new SocketsHttpHandler
+    {
+        AutomaticDecompression = DecompressionMethods.All,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+    }) { Timeout = TimeSpan.FromSeconds(20) };
     readonly ServerConfig cfg;
     string? access, refresh;
     DateTime expiresUtc;
 
     public string UserId { get; private set; } = "";
+
+    public ServerConfig Config => cfg;
+
+    /// <summary>False for the offline demo, which has no server to listen to.</summary>
+    public virtual bool SupportsRealtime => true;
+
+    /// <summary>The current sign-in token, refreshed if it is about to expire.</summary>
+    public async Task<string?> GetAccessTokenAsync()
+    {
+        try { await EnsureFreshAsync(); } catch { }
+        return access;
+    }
 
     public Api(ServerConfig config) { cfg = config; }
 
@@ -190,6 +216,15 @@ public class Api
         return null;
     }
 
+    /// <summary>Changes the signed-in user's own password after checking the current one.</summary>
+    public virtual async Task ChangePasswordAsync(string email, string currentPassword, string newPassword)
+    {
+        // prove they know the current password (this does not replace the running session)
+        await SendAsync(HttpMethod.Post, "/auth/v1/token?grant_type=password",
+            JsonSerializer.Serialize(new { email, password = currentPassword }), needAuth: false);
+        await SendAsync(HttpMethod.Put, "/auth/v1/user", JsonSerializer.Serialize(new { password = newPassword }));
+    }
+
     public virtual Task CreateUserAsync(string username, string password, string displayName, string role) =>
         RpcAsync("admin_create_user", new { p_username = username, p_password = password, p_display_name = displayName, p_role = role });
 
@@ -208,28 +243,44 @@ public class Api
     public virtual Task DeleteUserAsync(string userId) =>
         RpcAsync("admin_delete_user", new { p_user = userId });
 
-    public virtual async Task LoadAsync(string clientId, ClientData into)
+    /// <summary>Reads a client's rows. With <paramref name="only"/> set, reads just that table (one request instead of four).</summary>
+    public virtual async Task LoadAsync(string clientId, ClientData into, string? only = null)
     {
         var f = $"?client_id=eq.{clientId}";
-        var tTicks = SendAsync(HttpMethod.Get, "/rest/v1/ticks" + f + "&select=camo_id");
-        var tLevels = SendAsync(HttpMethod.Get, "/rest/v1/levels" + f + "&select=weapon_key,level");
-        var tClasses = SendAsync(HttpMethod.Get, "/rest/v1/classes" + f + "&select=weapon_key,cls");
-        var tCustom = SendAsync(HttpMethod.Get, "/rest/v1/custom_weapons" + f + "&select=id,name,cls&order=created_at");
-        await Task.WhenAll(tTicks, tLevels, tClasses, tCustom);
+        Task<string>? tTicks = null, tLevels = null, tClasses = null, tCustom = null;
+        if (only is null or "ticks") tTicks = SendAsync(HttpMethod.Get, "/rest/v1/ticks" + f + "&select=camo_id");
+        if (only is null or "levels") tLevels = SendAsync(HttpMethod.Get, "/rest/v1/levels" + f + "&select=weapon_key,level");
+        if (only is null or "classes") tClasses = SendAsync(HttpMethod.Get, "/rest/v1/classes" + f + "&select=weapon_key,cls");
+        if (only is null or "custom_weapons") tCustom = SendAsync(HttpMethod.Get, "/rest/v1/custom_weapons" + f + "&select=id,name,cls&order=created_at");
+        await Task.WhenAll(new[] { tTicks, tLevels, tClasses, tCustom }.Where(t => t != null)!);
 
-        into.Ticks.Clear(); into.Levels.Clear(); into.Classes.Clear(); into.Customs.Clear();
-        using (var d = JsonDocument.Parse(tTicks.Result))
+        if (tTicks != null)
+        {
+            into.Ticks.Clear();
+            using var d = JsonDocument.Parse(tTicks.Result);
             foreach (var e in d.RootElement.EnumerateArray()) into.Ticks.Add(Str(e, "camo_id"));
-        using (var d = JsonDocument.Parse(tLevels.Result))
+        }
+        if (tLevels != null)
+        {
+            into.Levels.Clear();
+            using var d = JsonDocument.Parse(tLevels.Result);
             foreach (var e in d.RootElement.EnumerateArray())
                 into.Levels[Str(e, "weapon_key")] = e.TryGetProperty("level", out var lv) && lv.ValueKind == JsonValueKind.Number ? lv.GetInt32() : 0;
-        using (var d = JsonDocument.Parse(tClasses.Result))
+        }
+        if (tClasses != null)
+        {
+            into.Classes.Clear();
+            using var d = JsonDocument.Parse(tClasses.Result);
             foreach (var e in d.RootElement.EnumerateArray()) into.Classes[Str(e, "weapon_key")] = Str(e, "cls");
-        using (var d = JsonDocument.Parse(tCustom.Result))
+        }
+        if (tCustom != null)
+        {
+            into.Customs.Clear();
+            using var d = JsonDocument.Parse(tCustom.Result);
             foreach (var e in d.RootElement.EnumerateArray())
                 into.Customs.Add(new CustomWeapon(Str(e, "id"), Str(e, "name"), Str(e, "cls")));
+        }
     }
-
     const string Merge = "resolution=merge-duplicates,return=minimal";
 
     public virtual Task SetTickAsync(string clientId, string camoId, bool on) => on

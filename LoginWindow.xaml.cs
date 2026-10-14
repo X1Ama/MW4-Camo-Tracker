@@ -21,6 +21,8 @@ public partial class LoginWindow : Window
         ServerExpander.Visibility = cfg.IsComplete ? Visibility.Collapsed : Visibility.Visible;
         Loaded += (_, _) => (EmailBox.Text.Length == 0 ? (UIElement)EmailBox : PasswordBox).Focus();
         Loaded += async (_, _) => await CheckForUpdateAsync();
+        GotKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(UpdateHints, System.Windows.Threading.DispatcherPriority.Input);
+        LostKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(UpdateHints, System.Windows.Threading.DispatcherPriority.Input);
     }
 
     UpdateInfo? pending;
@@ -56,11 +58,19 @@ public partial class LoginWindow : Window
         }
     }
 
-            void Pw_Changed(object sender, RoutedEventArgs e) =>
-        PwHint.Visibility = Pw.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+    // The hints show only while a box is empty and not focused, so they never sit under the typing cursor.
+    void UpdateHints()
+    {
+        bool pwFocused = PasswordBox.IsKeyboardFocused || PlainBox.IsKeyboardFocused;
+        PwHint.Visibility = Pw.Length == 0 && !pwFocused ? Visibility.Visible : Visibility.Collapsed;
+        UserHint.Visibility = EmailBox.Text.Length == 0 && !EmailBox.IsKeyboardFocused
+            ? Visibility.Visible : Visibility.Collapsed;
+    }
 
-    void User_Changed(object sender, RoutedEventArgs e) =>
-        UserHint.Visibility = EmailBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+    void Pw_Changed(object sender, RoutedEventArgs e) => UpdateHints();
+
+    void User_Changed(object sender, RoutedEventArgs e) => UpdateHints();
+
     string Pw => PlainBox.Visibility == Visibility.Visible ? PlainBox.Text : PasswordBox.Password;
 
     void ShowButton_Click(object sender, RoutedEventArgs e)

@@ -12,7 +12,7 @@ public partial class MainWindow : Window
 
     readonly Api api;
     readonly Profile me;
-    readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(4) };
+    readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(10) };
     List<Profile> clients = new();
     Profile? target;
     ClientData data = new();
@@ -21,9 +21,23 @@ public partial class MainWindow : Window
     string filter = "all";
     string query = "";
     int inflight;
+    RealtimeClient? realtime;
     bool CanEdit => target != null && (me.IsStaff || target.Id == me.Id);
 
     static Brush Res(string key) => (Brush)Application.Current.Resources[key];
+    static readonly FontFamily Mono = new("Consolas");
+    static readonly Brush DoneTint = Frozen(Color.FromRgb(0x24, 0x20, 0x0A));
+    static readonly Brush DoneLine = Frozen(Color.FromRgb(0xA8, 0x8A, 0x1A));
+    static readonly Geometry MinusGeo = Geometry.Parse("M0,5 L10,5");
+    static readonly Geometry PlusGeo = Geometry.Parse("M0,5 L10,5 M5,0 L5,10");
+
+    static Brush Frozen(Color c)
+    {
+        var b = new SolidColorBrush(c);
+        b.Freeze();
+        return b;
+    }
+
     static FontFamily DisplayFont => (FontFamily)Application.Current.Resources["Display"];
 
     public MainWindow(Api api, Profile me)
@@ -33,7 +47,7 @@ public partial class MainWindow : Window
         TitleBar.Apply(this);
         InitializeComponent();
         AdminButton.Visibility = me.IsStaff ? Visibility.Visible : Visibility.Collapsed;
-        UserText.Text = $"{me.Label}  ·  {me.Role}  ·  v{Updater.CurrentText}";
+        UserText.Text = $"{me.Label}  ·  {Catalog.RoleLabel(me.Role)}  ·  v{Updater.CurrentText}";
 
         BuildTabs();
         BuildFilters();
@@ -43,16 +57,30 @@ public partial class MainWindow : Window
             SidePanel.Visibility = Visibility.Collapsed;
             SideCol.Width = new GridLength(0);
             target = me;
+            Loaded += (_, _) => realtime?.Watch(me.Id);
         }
 
-        timer.Tick += async (_, _) => { if (inflight == 0) await RefreshAsync(); };
+        timer.Tick += async (_, _) =>
+        {
+            // Fast safety-net polling until the server confirms live updates are working.
+            bool idle = !IsActive || WindowState == WindowState.Minimized;
+            timer.Interval = TimeSpan.FromSeconds(liveInstant ? (idle ? 120 : 30) : (idle ? 10 : 2));
+            if (inflight == 0) await RefreshAsync();
+        };
         Loaded += async (_, _) =>
         {
             if (me.IsStaff) await LoadClientsAsync();
             else { UpdateTitle(); await RefreshAsync(); }
             timer.Start();
         };
-        Closed += (_, _) => timer.Stop();
+        Closed += (_, _) => { timer.Stop(); searchDebounce.Stop(); realtime?.Dispose(); };
+        searchDebounce.Tick += (_, _) => { searchDebounce.Stop(); Render(); };
+        if (api.SupportsRealtime)
+        {
+            realtime = new RealtimeClient(api.Config.Url, api.Config.AnonKey, api.GetAccessTokenAsync);
+            realtime.Changed += OnRemoteChange;
+            realtime.ConnectionChanged += ok => Dispatcher.BeginInvoke(() => liveInstant = ok);
+        }
         _ = CheckUpdateAsync();
         var updateTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
         updateTimer.Tick += async (_, _) => await CheckUpdateAsync();
@@ -111,7 +139,7 @@ public partial class MainWindow : Window
 
     void UpdateTitle()
     {
-        TitleText.Text = target == null ? "MASTERY CAMO TRACKER" : target.Label.ToUpperInvariant();
+        TitleText.Text = target == null ? "MASTERY CAMO TRACKER" : target.Label;
         KickerText.Text = me.IsStaff ? "MW4 · MANAGING" : "MW4 · MASTERY CAMO TRACKER";
     }
 
@@ -148,11 +176,36 @@ public partial class MainWindow : Window
     }
     public void OpenAdminPanel() => Admin_Click(this, new RoutedEventArgs());
 
+    PasswordPanel? passwordPanel;
+
+    void ChangePassword_Click(object sender, RoutedEventArgs e)
+    {
+        if (passwordPanel == null)
+        {
+            passwordPanel = new PasswordPanel(api, me) { Visibility = Visibility.Collapsed };
+            Grid.SetColumnSpan(passwordPanel, 2);
+            System.Windows.Controls.Panel.SetZIndex(passwordPanel, 20);
+            passwordPanel.CloseRequested += () => passwordPanel.Visibility = Visibility.Collapsed;
+            ((Grid)Content).Children.Add(passwordPanel);
+        }
+        passwordPanel.Reset();
+        passwordPanel.Visibility = Visibility.Visible;
+    }
+
+    AdminPanel? adminPanel;
+
     void Admin_Click(object sender, RoutedEventArgs e)
     {
-        var w = new AdminWindow(api, me) { Owner = this };
-        w.Changed += async () => await LoadClientsAsync();
-        w.Show();
+        if (adminPanel == null)
+        {
+            adminPanel = new AdminPanel(api, me) { Visibility = Visibility.Collapsed };
+            Grid.SetColumnSpan(adminPanel, 2);
+            System.Windows.Controls.Panel.SetZIndex(adminPanel, 10);
+            adminPanel.Changed += async () => await LoadClientsAsync();
+            adminPanel.CloseRequested += () => adminPanel.Visibility = Visibility.Collapsed;
+            ((Grid)Content).Children.Add(adminPanel);
+        }
+        adminPanel.Visibility = Visibility.Visible;
     }
 
     void SignOut_Click(object sender, RoutedEventArgs e)
@@ -162,10 +215,13 @@ public partial class MainWindow : Window
         Close();
     }
 
+    readonly DispatcherTimer searchDebounce = new() { Interval = TimeSpan.FromMilliseconds(150) };
+
     void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         query = SearchBox.Text.Trim();
-        Render();
+        searchDebounce.Stop();
+        searchDebounce.Start();
     }
 
     // ---- clients (staff) ------------------------------------------------------
@@ -205,6 +261,7 @@ public partial class MainWindow : Window
     {
         if (ClientList.SelectedItem is not Profile p || p.Id == target?.Id) return;
         target = p;
+        realtime?.Watch(p.Id);
         data = new ClientData();
         lastSig = "";
         UpdateTitle();
@@ -214,14 +271,38 @@ public partial class MainWindow : Window
 
     // ---- sync -----------------------------------------------------------------
 
-    async Task RefreshAsync()
+    bool liveInstant;
+    int remoteTicket;
+
+    /// <summary>A change landed on the server: re-read soon (a short delay lets bursts of changes merge).</summary>
+    readonly HashSet<string> pendingTables = new();
+    bool pendingFull;
+
+    void OnRemoteChange(string? table)
+    {
+        Dispatcher.BeginInvoke(async () =>
+        {
+            if (table == null) pendingFull = true; else pendingTables.Add(table);
+            int ticket = Interlocked.Increment(ref remoteTicket);
+            await Task.Delay(120);
+            if (ticket != remoteTicket) return; // a newer change will do the refresh
+            for (int i = 0; i < 20 && inflight > 0; i++) await Task.Delay(100);
+            string? only = !pendingFull && pendingTables.Count == 1 ? pendingTables.First() : null;
+            pendingFull = false;
+            pendingTables.Clear();
+            await RefreshAsync(only);
+        });
+    }
+
+    async Task RefreshAsync(string? only = null)
     {
         var who = target;
         if (who == null) return;
         try
         {
             var fresh = new ClientData();
-            await api.LoadAsync(who.Id, fresh);
+            if (only != null) fresh.CopyFrom(data); // keep the other tables, re-read just this one
+            await api.LoadAsync(who.Id, fresh, only);
             if (inflight > 0 || who.Id != target?.Id) return;
             var sig = fresh.Signature();
             if (sig != lastSig)
@@ -230,7 +311,7 @@ public partial class MainWindow : Window
                 lastSig = sig;
                 Render();
             }
-            SetStatus("Live · checked " + DateTime.Now.ToString("HH:mm:ss"), true);
+            SetStatus((liveInstant ? "Live (instant) · " : "Live · ") + "checked " + DateTime.Now.ToString("HH:mm:ss"), true);
         }
         catch (Exception ex)
         {
@@ -283,11 +364,14 @@ public partial class MainWindow : Window
 
     static Border Panel(UIElement child, Brush? left = null) => new()
     {
-        Background = Res("Panel"),
-        BorderBrush = left ?? Res("Line"),
-        BorderThickness = new Thickness(left == null ? 1 : 4, 1, 1, 1),
+        // A finished weapon gets an even green outline and a faint green tint, not a thick left edge
+        // (a thick side next to rounded corners looks lopsided).
+        Background = left == null ? Res("Panel") : DoneTint,
+        BorderBrush = left == null ? Res("Line") : DoneLine,
+        BorderThickness = new Thickness(1),
         Padding = new Thickness(14, 12, 14, 12),
         Margin = new Thickness(0, 8, 0, 0),
+        CornerRadius = new CornerRadius(10),
         Child = child,
     };
 
@@ -339,7 +423,7 @@ public partial class MainWindow : Window
             head.Children.Add(new TextBlock
             {
                 Text = $"{gd}/{gt}",
-                FontFamily = new FontFamily("Consolas"),
+                FontFamily = Mono,
                 Foreground = Res("Muted"),
                 FontSize = 12,
             });
@@ -358,7 +442,7 @@ public partial class MainWindow : Window
         if (TrackerPanel.Children.Count == 0)
             TrackerPanel.Children.Add(new TextBlock { Text = "No matches.", Foreground = Res("Muted"), Margin = new Thickness(0, 16, 0, 0) });
 
-        if (CanEdit) TrackerPanel.Children.Add(BuildAddRow());
+        // Weapons are added in Catalog.cs by the app's maintainer, so there is no "Add weapon" box here.
 
         int pct = total == 0 ? 0 : (int)Math.Round(done * 100.0 / total);
         Progress.Value = pct;
@@ -405,7 +489,7 @@ public partial class MainWindow : Window
         left.Children.Add(new TextBlock
         {
             Text = $"{d}/{chips.Count} camos",
-            FontFamily = new FontFamily("Consolas"),
+            FontFamily = Mono,
             FontSize = 11,
             Foreground = Res("Muted"),
         });
@@ -443,7 +527,7 @@ public partial class MainWindow : Window
             {
                 Style = (Style)FindResource("Chip"),
                 Content = (on ? "✓  " : "◇  ") + c.Label.ToUpperInvariant(),
-                Width = 188,
+                Width = 226,
                 Margin = new Thickness(0, 0, 6, 6),
                 Background = on ? Res("Accent") : Res("Panel2"),
                 Foreground = on ? Res("AccentFg") : Res("Fg"),
@@ -478,7 +562,7 @@ public partial class MainWindow : Window
         g.Children.Add(new TextBlock
         {
             Text = $"LV {lv}",
-            FontFamily = new FontFamily("Consolas"),
+            FontFamily = Mono,
             FontSize = 11,
             Width = 46,
             VerticalAlignment = VerticalAlignment.Center,
@@ -489,11 +573,12 @@ public partial class MainWindow : Window
         {
             Background = Res("Fg"),
             Opacity = .8,
+            CornerRadius = new CornerRadius(3),
             HorizontalAlignment = HorizontalAlignment.Left,
         };
         track.Children.Add(fill);
         track.SizeChanged += (_, _) => fill.Width = track.ActualWidth * lv / Catalog.MaxLevel;
-        var trackBox = new Border { BorderBrush = Res("Line"), BorderThickness = new Thickness(1), Child = track, VerticalAlignment = VerticalAlignment.Center };
+        var trackBox = new Border { BorderBrush = Res("Line"), BorderThickness = new Thickness(1), Child = track, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(5), Padding = new Thickness(1) };
         Grid.SetColumn(trackBox, 1);
         g.Children.Add(trackBox);
 
@@ -509,6 +594,51 @@ public partial class MainWindow : Window
                     () => data.Levels[w.Key] = old,
                     () => api.SetLevelAsync(target!.Id, w.Key, v));
             }
+            // a box to type the level directly (digits only, 0 to the maximum)
+            g.Children.RemoveAt(0);
+            var levelBox = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Width = 76 };
+            levelBox.Children.Add(new TextBlock
+            {
+                Text = "LV",
+                FontFamily = Mono,
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0),
+            });
+            var input = new TextBox
+            {
+                Text = lv.ToString(),
+                Width = 40,
+                Height = 24,
+                MaxLength = 3,
+                FontFamily = Mono,
+                FontSize = 12,
+                Padding = new Thickness(2, 0, 2, 0),
+                VerticalContentAlignment = VerticalAlignment.Center,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                ToolTip = $"Type a level from 0 to {Catalog.MaxLevel}",
+            };
+            input.PreviewTextInput += (_, e) => e.Handled = !e.Text.All(char.IsAsciiDigit);
+            DataObject.AddPastingHandler(input, (_, e) =>
+            {
+                if (e.DataObject.GetData(DataFormats.Text) is string s && !s.All(char.IsAsciiDigit)) e.CancelCommand();
+            });
+            input.GotKeyboardFocus += (_, _) => input.SelectAll();
+            void CommitLevel()
+            {
+                if (int.TryParse(input.Text, out var typed)) SetLevel(typed);
+                input.Text = Math.Min(Catalog.MaxLevel, data.Levels.GetValueOrDefault(w.Key, 0)).ToString();
+            }
+            input.KeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Enter) { CommitLevel(); Keyboard.ClearFocus(); e.Handled = true; }
+                else if (e.Key == Key.Escape) { input.Text = lv.ToString(); Keyboard.ClearFocus(); e.Handled = true; }
+            };
+            input.LostKeyboardFocus += (_, _) => CommitLevel();
+            levelBox.Children.Add(input);
+            Grid.SetColumn(levelBox, 0);
+            g.Children.Add(levelBox);
+
             track.Background = Res("Panel2");
             track.MouseLeftButtonDown += (_, e) =>
                 SetLevel((int)Math.Round(e.GetPosition(track).X / Math.Max(1, track.ActualWidth) * Catalog.MaxLevel));
@@ -526,7 +656,7 @@ public partial class MainWindow : Window
                     HorizontalContentAlignment = HorizontalAlignment.Center,
                     Margin = new Thickness(2, 0, 0, 0),
                 };
-                b.Content = new TextBlock { Text = text, HorizontalAlignment = HorizontalAlignment.Center, Foreground = Res("Fg") };
+                b.Content = new System.Windows.Shapes.Path { Data = delta < 0 ? MinusGeo : PlusGeo, Stroke = Res("Fg"), StrokeThickness = 1.6, Width = 10, Height = 10, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, SnapsToDevicePixels = true };
                 var dlt = delta;
                 b.Click += (_, _) => SetLevel(data.Levels.GetValueOrDefault(w.Key, 0) + dlt);
                 btns.Children.Add(b);
@@ -537,54 +667,4 @@ public partial class MainWindow : Window
         return g;
     }
 
-    UIElement BuildAddRow()
-    {
-        var row = new DockPanel { Margin = new Thickness(0, 18, 0, 0) };
-        var add = new Button
-        {
-            Style = (Style)FindResource("Chip"),
-            Content = "ADD WEAPON",
-            Background = Res("Fg"),
-            Foreground = Res("AccentFg"),
-            Margin = new Thickness(8, 0, 0, 0),
-        };
-        DockPanel.SetDock(add, Dock.Right);
-        var combo = new ComboBox { Width = 150, Margin = new Thickness(8, 0, 0, 0) };
-        combo.Items.Add(new ComboBoxItem { Content = "Type…", Tag = "" });
-        foreach (var c in Catalog.Classes) combo.Items.Add(new ComboBoxItem { Content = c.Name, Tag = c.Code });
-        combo.SelectedIndex = 0;
-        DockPanel.SetDock(combo, Dock.Right);
-        var name = new TextBox { MaxLength = 40, ToolTip = "Weapon name" };
-
-        add.Click += async (_, _) =>
-        {
-            var n = name.Text.Trim();
-            if (n.Length == 0 || target == null) return;
-            var cls = (string)((ComboBoxItem)combo.SelectedItem).Tag;
-            add.IsEnabled = false;
-            inflight++;
-            try
-            {
-                var created = await api.AddCustomAsync(target.Id, n, cls);
-                data.Customs.Add(created);
-                lastSig = data.Signature();
-                name.Text = "";
-                Render();
-            }
-            catch (Exception ex)
-            {
-                SetStatus("Could not add weapon: " + ex.Message, false);
-            }
-            finally
-            {
-                inflight--;
-                add.IsEnabled = true;
-            }
-        };
-
-        row.Children.Add(add);
-        row.Children.Add(combo);
-        row.Children.Add(name);
-        return row;
-    }
 }

@@ -4,7 +4,7 @@ using System.Windows.Media;
 
 namespace MasteryTracker;
 
-public partial class AdminWindow : Window
+public partial class AdminPanel : UserControl
 {
     readonly Api api;
     readonly Profile me;
@@ -16,20 +16,24 @@ public partial class AdminWindow : Window
     /// <summary>Raised after anything changed so the main window can refresh its client list.</summary>
     public event Action? Changed;
 
+    /// <summary>Raised when the Back button is pressed so the main window can show the tracker again.</summary>
+    public event Action? CloseRequested;
+
+    void Back_Click(object sender, RoutedEventArgs e) => CloseRequested?.Invoke();
+
     bool IsOwner => me.Role == "owner";
 
-    public AdminWindow(Api api, Profile me)
+    public AdminPanel(Api api, Profile me)
     {
         this.api = api;
         this.me = me;
-        TitleBar.Apply(this);
         InitializeComponent();
 
         var roles = IsOwner ? new[] { "client", "admin", "owner" } : new[] { "client" };
         foreach (var r in roles)
         {
-            NewRole.Items.Add(r);
-            DetailRole.Items.Add(r);
+            NewRole.Items.Add(new ComboBoxItem { Content = Catalog.RoleLabel(r), Tag = r });
+            DetailRole.Items.Add(new ComboBoxItem { Content = Catalog.RoleLabel(r), Tag = r });
         }
         NewRole.SelectedIndex = 0;
         RoleRow.Visibility = IsOwner ? Visibility.Visible : Visibility.Collapsed;
@@ -75,6 +79,14 @@ public partial class AdminWindow : Window
 
     void UserSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilter();
 
+    void NewUser_Click(object sender, RoutedEventArgs e)
+    {
+        selected = null;
+        UserList.SelectedItem = null;
+        ShowDetail();
+        NewUser.Focus();
+    }
+
     void UserList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         selected = UserList.SelectedItem as Profile;
@@ -87,17 +99,19 @@ public partial class AdminWindow : Window
         if (p == null || !people.Any(x => x.Id == p.Id))
         {
             selected = null;
+            CreatePanel.Visibility = Visibility.Visible;
             DetailPanel.Visibility = Visibility.Collapsed;
             return;
         }
         selected = people.First(x => x.Id == p.Id);
         DetailPanel.Visibility = Visibility.Visible;
-        DetailTitle.Text = selected.Label.ToUpperInvariant();
-        DetailSub.Text = $"{selected.Email.Replace(Catalog.UserDomain, "")}  ·  {selected.Role}";
+        CreatePanel.Visibility = Visibility.Collapsed;
+        DetailTitle.Text = selected.Label;
+        DetailSub.Text = $"{Catalog.Cap(selected.Email.Replace(Catalog.UserDomain, ""))}  ·  {Catalog.RoleLabel(selected.Role)}";
         loadingDetail = true;
         DetailName.Text = selected.DisplayName;
         DetailPass.Text = "";
-        DetailRole.SelectedItem = selected.Role;
+        DetailRole.SelectedItem = DetailRole.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == selected.Role);
         loadingDetail = false;
 
         bool self = selected.Id == me.Id;
@@ -121,10 +135,11 @@ public partial class AdminWindow : Window
             {
                 var box = new CheckBox
                 {
+                    Style = (Style)FindResource("Pill"),
                     Content = c.Label,
                     IsChecked = links.Any(l => l.AdminId == adminId && l.ClientId == c.Id),
-                    Foreground = (Brush)Application.Current.Resources["Fg"],
-                    Margin = new Thickness(0, 3, 0, 3),
+                    Width = 220,
+                    Margin = new Thickness(0, 0, 10, 10),
                 };
                 var cid = c.Id;
                 box.Click += async (_, _) =>
@@ -171,7 +186,7 @@ public partial class AdminWindow : Window
         var user = NewUser.Text.Trim();
         var pass = NewPass.Text;
         var name = NewName.Text.Trim();
-        var role = (string?)NewRole.SelectedItem ?? "client";
+        var role = (NewRole.SelectedItem as ComboBoxItem)?.Tag as string ?? "client";
         if (user.Length == 0 || pass.Length == 0) { Say("Enter a user name and a password.", false); return; }
         if (!user.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '.' or '_' or '-'))
         {
@@ -205,7 +220,7 @@ public partial class AdminWindow : Window
 
     async void SetRole_Click(object sender, RoutedEventArgs e)
     {
-        if (selected == null || DetailRole.SelectedItem is not string role) return;
+        if (selected == null || (DetailRole.SelectedItem as ComboBoxItem)?.Tag is not string role) return;
         var id = selected.Id;
         await RunAsync(() => api.SetRoleAsync(id, role), "Role changed.");
     }
@@ -214,7 +229,7 @@ public partial class AdminWindow : Window
     {
         if (selected == null) return;
         var label = selected.Label;
-        var ask = MessageBox.Show(this,
+        var ask = MessageBox.Show(Window.GetWindow(this)!,
             $"Delete {label} and all of their progress? This cannot be undone.",
             "Delete user", MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (ask != MessageBoxResult.Yes) return;

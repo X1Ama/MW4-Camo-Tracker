@@ -528,6 +528,19 @@ public partial class MainWindow : Window
         Hide();
     }
 
+    /// <summary>Called when the app is started a second time: show this window, from the tray or the taskbar.</summary>
+    public void BringToFront()
+    {
+        if (tray != null) { RestoreFromTray(); return; }
+        ShowInTaskbar = true;
+        if (!IsVisible) Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+        Topmost = true;      // a brief nudge so Windows lets it come to the front
+        Topmost = false;
+        Focus();
+    }
+
     void RestoreFromTray()
     {
         tray?.Dispose();

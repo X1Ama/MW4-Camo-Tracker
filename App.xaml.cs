@@ -1,9 +1,14 @@
+using System.Threading;
 using System.Windows;
 
 namespace MasteryTracker;
 
 public partial class App : Application
 {
+    // held for the life of the process so the "already running" check stays valid
+    static Mutex? singleInstance;
+    static EventWaitHandle? showSignal;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -36,7 +41,26 @@ public partial class App : Application
             return;
         }
 
+        // Only one copy at a time: starting the app again brings the running one to the front instead.
+        const string ShowSignal = @"Local\MW4CamoTracker.ShowWindow";
+        singleInstance = new Mutex(true, @"Local\MW4CamoTracker.SingleInstance", out bool first);
+        if (!first)
+        {
+            try
+            {
+                using var ping = EventWaitHandle.OpenExisting(ShowSignal);
+                ping.Set();
+            }
+            catch { /* the first copy is still starting: nothing to wake yet */ }
+            Shutdown();
+            return;
+        }
+
         var window = new MainWindow();
+        showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, ShowSignal);
+        ThreadPool.RegisterWaitForSingleObject(showSignal, (_, _) =>
+            Dispatcher.BeginInvoke(window.BringToFront), null, Timeout.Infinite, executeOnlyOnce: false);
+
         if (ServerConfig.Load().StartMinimized) window.StartInTray();   // hidden: only a tray icon until opened
         else window.Show();
     }

@@ -293,9 +293,6 @@
                                 <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Accent}"/>
                                 <Setter Property="Foreground" Value="{StaticResource Fg}"/>
                             </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Accent}"/>
-                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>

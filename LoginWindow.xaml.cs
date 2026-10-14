@@ -12,6 +12,7 @@ public partial class LoginWindow : Window
         TitleBar.Apply(this);
         InitializeComponent();
         EmailBox.Text = cfg.LastEmail;
+        VersionText.Text = "v" + Updater.CurrentText;
         UrlBox.Text = cfg.Url;
         KeyBox.Text = cfg.AnonKey;
         // Clients get a server.json beside the exe, so only an unconfigured copy shows these fields.

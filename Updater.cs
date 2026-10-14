@@ -17,6 +17,15 @@ public sealed record UpdateInfo(Version Version, string Url, string Notes, bool 
 /// </summary>
 public static class Updater
 {
+    static readonly HttpClient Http = CreateHttp();
+
+    static HttpClient CreateHttp()
+    {
+        var c = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        c.DefaultRequestHeaders.UserAgent.ParseAdd("MasteryCamoTracker-updater");
+        return c;
+    }
+
     public static Version Current
     {
         get
@@ -37,9 +46,8 @@ public static class Updater
         try
         {
             if (!manifestUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return null;
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("MasteryCamoTracker-updater");
-            var json = await http.GetStringAsync(manifestUrl);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var json = await Http.GetStringAsync(manifestUrl, cts.Token);
             using var d = JsonDocument.Parse(json);
             var r = d.RootElement;
             var version = Normalize(Version.Parse(r.GetProperty("version").GetString()!));
@@ -61,10 +69,8 @@ public static class Updater
         var exe = Environment.ProcessPath ?? throw new InvalidOperationException("Cannot find the running program.");
         var fresh = exe + ".new";
 
-        using (var http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) })
         {
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("MasteryCamoTracker-updater");
-            using var res = await http.GetAsync(info.Url, HttpCompletionOption.ResponseHeadersRead);
+            using var res = await Http.GetAsync(info.Url, HttpCompletionOption.ResponseHeadersRead);
             res.EnsureSuccessStatusCode();
             var total = res.Content.Headers.ContentLength ?? 0;
             await using var src = await res.Content.ReadAsStreamAsync();

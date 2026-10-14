@@ -5,3 +5,5 @@ release/
 .vs/
 # Your server details stay on your PC and are shipped beside the exe, not in the repository.
 server.json
+shot*.png
+

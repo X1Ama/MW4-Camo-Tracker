@@ -1,4 +1,4 @@
-<Window x:Class="MasteryTracker.MainWindow"
+<Window Icon="app.ico" Foreground="{StaticResource Fg}" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" x:Class="MasteryTracker.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Mastery Camo Tracker" Width="1200" Height="800" MinWidth="760" MinHeight="520"
@@ -36,6 +36,7 @@
                                VerticalAlignment="Center" Margin="0,0,12,0"/>
                     <Button x:Name="UpdateButton" Style="{StaticResource Chip}" Content="UPDATE AVAILABLE" FontSize="13" Padding="10,5" Margin="0,0,8,0" Visibility="Collapsed" Background="{StaticResource Accent}" Foreground="{StaticResource AccentFg}" BorderBrush="{StaticResource Accent}" Click="Update_Click"/>
                     <Button x:Name="AdminButton" Style="{StaticResource Chip}" Content="ADMIN PANEL" FontSize="13" Padding="10,5" Margin="0,0,8,0" Visibility="Collapsed" Click="Admin_Click"/>
+                    <Button Style="{StaticResource Chip}" Content="CHANGE PASSWORD" FontSize="13" Padding="10,5" Margin="0,0,8,0" Click="ChangePassword_Click"/>
                     <Button Style="{StaticResource Chip}" Content="SIGN OUT" FontSize="13" Padding="10,5"
                             Click="SignOut_Click"/>
                 </StackPanel>

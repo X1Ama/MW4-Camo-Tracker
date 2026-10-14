@@ -8,8 +8,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>MasteryCamoTracker</AssemblyName>
     <RootNamespace>MasteryTracker</RootNamespace>
-    <ApplicationIcon></ApplicationIcon>
-    <Version>0.1.0</Version>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>0.1.2</Version>
+    <!-- keep only the English WPF resources (drops about a dozen language packs) -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- one fewer background GC thread and less memory held back -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>false</TieredPGO>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
 
   <!-- dotnet publish -c Release -r win-x64 produces one self-contained .exe -->
@@ -19,5 +27,9 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="app.ico" />
+  </ItemGroup>
 
 </Project>

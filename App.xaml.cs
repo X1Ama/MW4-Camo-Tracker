@@ -15,6 +15,14 @@ public partial class App : Application
 
         // --demo        open with sample data and no server (nothing is saved)
         // --demo --admin   also open the admin panel straight away
+        // --demo-client   open as a signed-in client (Hoodie) with sample data
+        if (e.Args.Contains("--demo-client"))
+        {
+            var clientWindow = new MainWindow(new DemoApi(), DemoApi.Client);
+            clientWindow.Title += " (demo client, nothing is saved)";
+            clientWindow.Show();
+            return;
+        }
         if (e.Args.Contains("--demo"))
         {
             var main = new MainWindow(new DemoApi(), DemoApi.Owner);

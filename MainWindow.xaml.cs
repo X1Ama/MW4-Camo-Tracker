@@ -65,7 +65,12 @@ public partial class MainWindow : Window
         Closed += (_, _) => { timer.Stop(); searchDebounce.Stop(); updateTimer.Stop(); realtime?.Dispose(); };
 
         ShowLogin();
-        if (allowResume) _ = TryResumeAsync();
+        if (allowResume)
+        {
+            var saved = ServerConfig.Load();
+            if (saved.IsComplete && saved.RememberMe && SessionStore.Load() != null) loginPanel?.HideForm();
+            _ = TryResumeAsync();
+        }
     }
 
     /// <summary>Opens straight into a session, used by the offline demo modes.</summary>
@@ -102,26 +107,41 @@ public partial class MainWindow : Window
     async Task TryResumeAsync()
     {
         var token = SessionStore.Load();
-        if (token == null || loginPanel == null) return;
+        if (token == null || loginPanel == null) { SessionStore.Log(token == null ? "no saved sign-in found" : "no login screen"); return; }
         var cfg = ServerConfig.Load();
         if (!cfg.IsComplete || !cfg.RememberMe) return;
         loginPanel.SetBusy("SIGNING YOU IN\u2026");
-        try
+        for (int attempt = 0; attempt < 3; attempt++)
         {
-            var resumed = new Api(cfg);
-            Timing.Start("remembered session used");
-            var profile = await resumed.ResumeAsync(token);
-            StartSession(resumed, profile, true);
+            try
+            {
+                var resumed = new Api(cfg);
+                Timing.Start("remembered session used");
+                var profile = await resumed.ResumeAsync(token);
+                SessionStore.Log("resumed ok");
+                StartSession(resumed, profile, true);
+                return;
+            }
+            catch (ApiException ex) when (ex.Status is 400 or 401 or 403)
+            {
+                SessionStore.Log($"server said {ex.Status}: {ex.Message}");
+                // Another copy of the app (for example the one being replaced during an update) may have just
+                // renewed the token. Use the newer one before giving up on the saved sign-in.
+                var latest = SessionStore.Load();
+                if (latest != null && latest != token) { token = latest; continue; }
+                if (attempt == 0) { await Task.Delay(1500); continue; }   // the old copy may still be saving
+                SessionStore.Clear();
+                loginPanel?.SetBusy(null);
+                return;
+            }
+            catch (Exception ex)
+            {
+                SessionStore.Log("could not reach the server: " + ex.Message);
+                loginPanel?.SetBusy(null);          // offline: let them try by hand and keep the saved sign-in
+                return;
+            }
         }
-        catch (ApiException ex) when (ex.Status is 400 or 401 or 403)
-        {
-            SessionStore.Clear();               // the saved sign-in is no longer valid: ask normally
-            loginPanel?.SetBusy(null);
-        }
-        catch
-        {
-            loginPanel?.SetBusy(null);          // offline: let them try by hand and keep the saved sign-in
-        }
+        loginPanel?.SetBusy(null);
     }
 
     bool updatePopupShown;

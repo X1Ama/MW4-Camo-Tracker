@@ -58,8 +58,12 @@ public partial class LoginPanel : UserControl
     }
 
     /// <summary>Shows a "signing you in" state while a remembered session is being restored.</summary>
+    /// <summary>Hides the sign-in form while a remembered sign-in is being used, so it never flashes.</summary>
+    public void HideForm() => FormScroll.Visibility = Visibility.Hidden;
+
     public void SetBusy(string? message)
     {
+        if (message == null) FormScroll.Visibility = Visibility.Visible;
         IsEnabled = message == null;
         SignInButton.Content = message ?? "SIGN IN";
     }

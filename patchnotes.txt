@@ -1,4 +1,4 @@
-- New "Remember me" tick box on the sign-in screen keeps you signed in on this PC
-- Update notes now pop up after you sign in, instead of sitting on the sign-in screen
-- The app has its own identity in Windows for the taskbar and Start menu
-- Smaller tidy-ups to the sign-in screen
+- Deleting a user now asks in a clean in-app box instead of a Windows pop-up
+- Remember me signs you straight in with no sign-in screen flash
+- Remember me is more reliable after an update
+- Fixed the tick box and the warning icon so they are centred and crisp

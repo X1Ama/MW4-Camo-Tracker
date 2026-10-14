@@ -211,6 +211,7 @@
         </Style>
 
         <Style x:Key="Pill" TargetType="CheckBox">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Foreground" Value="{StaticResource Fg}"/>
             <Setter Property="FontSize" Value="14"/>
@@ -220,13 +221,13 @@
                         <Border x:Name="Card" Background="{StaticResource Panel2}" BorderBrush="{StaticResource Line}"
                                 BorderThickness="1" CornerRadius="8" Padding="12,10">
                             <StackPanel Orientation="Horizontal">
-                                <Border x:Name="Box" Width="20" Height="20" CornerRadius="5" BorderThickness="1.5"
-                                        BorderBrush="{StaticResource Muted}" Background="Transparent"
-                                        VerticalAlignment="Center">
-                                    <Path x:Name="Tick" Data="M4,9.5 L8,13.5 L15,5.5" Stroke="{StaticResource AccentFg}"
-                                          StrokeThickness="2.2" StrokeLineJoin="Round" StrokeStartLineCap="Round"
-                                          StrokeEndLineCap="Round" Visibility="Collapsed"/>
-                                </Border>
+                                <Grid Width="20" Height="20" VerticalAlignment="Center">
+                                <Border x:Name="Fill" CornerRadius="6" Background="Transparent"/>
+                                <Border x:Name="Box" CornerRadius="6" BorderThickness="1.5" BorderBrush="{StaticResource Muted}"/>
+                                <Path x:Name="Tick" Data="M0,4 L3.6,7.6 L10,0.6" Width="10" Height="8" Stretch="Fill" HorizontalAlignment="Center" VerticalAlignment="Center" Stroke="{StaticResource AccentFg}"
+                                      StrokeThickness="2" StrokeLineJoin="Round" StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" Visibility="Collapsed"/>
+                            </Grid>
                                 <ContentPresenter Margin="12,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
@@ -236,7 +237,7 @@
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
-                                <Setter TargetName="Box" Property="Background" Value="{StaticResource Accent}"/>
+                                <Setter TargetName="Fill" Property="Background" Value="{StaticResource Accent}"/>
                                 <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Accent}"/>
                                 <Setter TargetName="Card" Property="Background" Value="#24200A"/>
                                 <Setter TargetName="Card" Property="BorderBrush" Value="#A88A1A"/>
@@ -264,6 +265,7 @@
         </Style>
 
         <Style x:Key="RememberBox" TargetType="CheckBox">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Foreground" Value="{StaticResource Muted}"/>
             <Setter Property="FontSize" Value="14"/>
@@ -271,12 +273,13 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
                         <StackPanel Orientation="Horizontal" Background="Transparent">
-                            <Border x:Name="Box" Width="20" Height="20" CornerRadius="6" BorderThickness="1.5"
-                                    BorderBrush="{StaticResource Muted}" Background="Transparent" VerticalAlignment="Center">
-                                <Path x:Name="Tick" Data="M4,9.5 L8,13.5 L15,5.5" Stroke="{StaticResource AccentFg}"
-                                      StrokeThickness="2.2" StrokeLineJoin="Round" StrokeStartLineCap="Round"
+                            <Grid Width="20" Height="20" VerticalAlignment="Center">
+                                <Border x:Name="Fill" CornerRadius="6" Background="Transparent"/>
+                                <Border x:Name="Box" CornerRadius="6" BorderThickness="1.5" BorderBrush="{StaticResource Muted}"/>
+                                <Path x:Name="Tick" Data="M0,4 L3.6,7.6 L10,0.6" Width="10" Height="8" Stretch="Fill" HorizontalAlignment="Center" VerticalAlignment="Center" Stroke="{StaticResource AccentFg}"
+                                      StrokeThickness="2" StrokeLineJoin="Round" StrokeStartLineCap="Round"
                                       StrokeEndLineCap="Round" Visibility="Collapsed"/>
-                            </Border>
+                            </Grid>
                             <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                         <ControlTemplate.Triggers>
@@ -286,7 +289,7 @@
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
-                                <Setter TargetName="Box" Property="Background" Value="{StaticResource Accent}"/>
+                                <Setter TargetName="Fill" Property="Background" Value="{StaticResource Accent}"/>
                                 <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Accent}"/>
                                 <Setter Property="Foreground" Value="{StaticResource Fg}"/>
                             </Trigger>

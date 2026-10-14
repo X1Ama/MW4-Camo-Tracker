@@ -20,7 +20,9 @@ public static class SessionStore
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
             var sealedBytes = ProtectedData.Protect(Encoding.UTF8.GetBytes(refreshToken), null, DataProtectionScope.CurrentUser);
-            File.WriteAllBytes(FilePath, sealedBytes);
+            var tmp = FilePath + ".tmp";
+            File.WriteAllBytes(tmp, sealedBytes);
+            File.Move(tmp, FilePath, true);          // never leaves a half-written file behind
         }
         catch { /* remembering is optional */ }
     }
@@ -34,6 +36,17 @@ public static class SessionStore
             return Encoding.UTF8.GetString(plain);
         }
         catch { return null; }
+    }
+
+    /// <summary>One line per remembered-sign-in attempt, so a failure can be explained afterwards.</summary>
+    public static void Log(string line)
+    {
+        try
+        {
+            var p = Path.Combine(Path.GetDirectoryName(FilePath)!, "remember.log");
+            File.AppendAllText(p, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + line + Environment.NewLine);
+        }
+        catch { }
     }
 
     public static void Clear()

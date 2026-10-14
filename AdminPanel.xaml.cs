@@ -225,14 +225,30 @@ public partial class AdminPanel : UserControl
         await RunAsync(() => api.SetRoleAsync(id, role), "Role changed.");
     }
 
+    ConfirmDialog? confirmDialog;
+
+    /// <summary>The in-window confirmation box, created the first time it is needed.</summary>
+    ConfirmDialog Confirm()
+    {
+        if (confirmDialog == null)
+        {
+            confirmDialog = new ConfirmDialog();
+            Grid.SetColumnSpan(confirmDialog, 2);
+            System.Windows.Controls.Panel.SetZIndex(confirmDialog, 50);
+            ((Grid)Content).Children.Add(confirmDialog);
+        }
+        return confirmDialog;
+    }
+
     async void Delete_Click(object sender, RoutedEventArgs e)
     {
         if (selected == null) return;
         var label = selected.Label;
-        var ask = MessageBox.Show(Window.GetWindow(this)!,
-            $"Delete {label} and all of their progress? This cannot be undone.",
-            "Delete user", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        if (ask != MessageBoxResult.Yes) return;
+        var confirmed = await Confirm().AskAsync(
+            $"Delete {label}?",
+            $"This removes {label} and all of their progress. This cannot be undone.",
+            "DELETE USER");
+        if (!confirmed) return;
         var id = selected.Id;
         selected = null;
         await RunAsync(() => api.DeleteUserAsync(id), $"Deleted {label}.");

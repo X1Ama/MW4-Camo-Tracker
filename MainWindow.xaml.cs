@@ -42,6 +42,7 @@ public partial class MainWindow : Window
 
     readonly DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromMinutes(30) };
     LoginPanel? loginPanel;
+    bool trimmed;
 
     public MainWindow() : this(true) { }
 
@@ -57,6 +58,7 @@ public partial class MainWindow : Window
             if (api == null) return;
             // Fast safety-net polling until the server confirms live updates are working.
             bool idle = !IsActive || WindowState == WindowState.Minimized;
+            if (idle) { if (!trimmed) { trimmed = true; MemoryTrim.Run(); } } else trimmed = false;
             timer.Interval = TimeSpan.FromSeconds(liveInstant ? (idle ? 60 : 8) : (idle ? 10 : 2));
             if (inflight == 0) await RefreshAsync();
         };

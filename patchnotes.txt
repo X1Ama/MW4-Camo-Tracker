@@ -1,2 +1,1 @@
-- Un-ticking a camo now shows up on other screens instantly
-- Faster background checking as a safety net
+- Uses far less memory while the app sits in the background

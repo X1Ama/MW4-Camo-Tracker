@@ -8,12 +8,13 @@ using System.Windows;
 
 namespace MasteryTracker;
 
-public sealed record UpdateInfo(Version Version, string Url, string Notes, bool Required);
+public sealed record UpdateInfo(Version Version, string Url, string Notes, bool Required, IReadOnlyList<string> Highlights);
 
 /// <summary>
 /// Checks a small update.json file (hosted anywhere over HTTPS, for example a GitHub Release asset),
 /// downloads the new exe and swaps it in. The manifest looks like:
-/// { "version": "0.2.0", "url": "https://.../MasteryCamoTracker.exe", "notes": "What changed", "required": false }
+/// { "version": "0.2.0", "url": "https://.../MasteryCamoTracker.exe", "notes": ["First change", "Second change"], "required": false }
+/// ("notes" may also be a single string.)
 /// </summary>
 public static class Updater
 {
@@ -25,6 +26,19 @@ public static class Updater
         c.DefaultRequestHeaders.UserAgent.ParseAdd("MasteryCamoTracker-updater");
         return c;
     }
+
+    /// <summary>Set by the --demo-update switch so the update screens can be previewed offline.</summary>
+    public static bool Preview { get; set; }
+
+    static readonly UpdateInfo PreviewUpdate = new(
+        new Version(9, 9, 9, 0), "https://example.invalid/MasteryCamoTracker.exe", "", false,
+        new[]
+        {
+            "Changes appear on your friend's screen almost instantly",
+            "The admin panel opens inside the main window",
+            "Clients can change their own password",
+            "Weapon levels can be typed in",
+        });
 
     public static Version Current
     {
@@ -43,6 +57,7 @@ public static class Updater
     /// <summary>Returns the update when the hosted version is newer than this build, otherwise null. Never throws.</summary>
     public static async Task<UpdateInfo?> CheckAsync(string manifestUrl)
     {
+        if (Preview) return PreviewUpdate;
         try
         {
             if (!manifestUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return null;
@@ -53,9 +68,31 @@ public static class Updater
             var version = Normalize(Version.Parse(r.GetProperty("version").GetString()!));
             var url = r.GetProperty("url").GetString() ?? "";
             if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return null;
-            var notes = r.TryGetProperty("notes", out var n) ? n.GetString() ?? "" : "";
+            var highlights = new List<string>();
+            var notes = "";
+            if (r.TryGetProperty("notes", out var n))
+            {
+                if (n.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in n.EnumerateArray())
+                    {
+                        var s = item.GetString();
+                        if (!string.IsNullOrWhiteSpace(s)) highlights.Add(s.Trim());
+                    }
+                }
+                else if (n.ValueKind == JsonValueKind.String)
+                {
+                    notes = n.GetString() ?? "";
+                    foreach (var line in notes.Split('\n'))
+                    {
+                        var s = line.Trim().TrimStart('-', '*', '\u2022').Trim();
+                        if (s.Length > 0) highlights.Add(s);
+                    }
+                }
+            }
+            if (notes.Length == 0) notes = string.Join("; ", highlights);
             var required = r.TryGetProperty("required", out var q) && q.ValueKind == JsonValueKind.True;
-            return version > Current ? new UpdateInfo(version, url, notes, required) : null;
+            return version > Current ? new UpdateInfo(version, url, notes, required, highlights) : null;
         }
         catch
         {
@@ -66,6 +103,11 @@ public static class Updater
     /// <summary>Downloads the new exe next to the current one, then swaps it in after this process exits and restarts.</summary>
     public static async Task DownloadAndRestartAsync(UpdateInfo info, IProgress<double>? progress = null)
     {
+        if (Preview)
+        {
+            for (int i = 1; i <= 10; i++) { await Task.Delay(120); progress?.Report(i / 10.0); }
+            throw new InvalidOperationException("Preview only: nothing was downloaded or changed.");
+        }
         var exe = Environment.ProcessPath ?? throw new InvalidOperationException("Cannot find the running program.");
         var fresh = exe + ".new";
 

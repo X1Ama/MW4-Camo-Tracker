@@ -9,7 +9,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$Version,
     [Parameter(Mandatory = $true)][string]$Repo,
-    [string]$Notes = "",
+    [string]$Notes = "",   # leave empty to use the lines of patchnotes.txt
     [switch]$Required
 )
 
@@ -31,12 +31,19 @@ if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 Get-ChildItem $out | Where-Object { $_.Name -ne "MasteryCamoTracker.exe" } | Remove-Item -Force -ErrorAction SilentlyContinue
 
 # 3. the manifest the apps read. "latest/download" always points at the newest release.
+$noteLines = @()
+if ($Notes) {
+    $noteLines = @($Notes)
+} elseif (Test-Path (Join-Path $here "patchnotes.txt")) {
+    $noteLines = @(Get-Content (Join-Path $here "patchnotes.txt") | Where-Object { $_ -match '^\s*[-*]\s+\S' } |
+        ForEach-Object { ($_ -replace '^\s*[-*]\s+', '').Trim() })
+}
 $manifest = [ordered]@{
     version  = $Version
     url      = "https://github.com/$Repo/releases/latest/download/MasteryCamoTracker.exe"
-    notes    = $Notes
+    notes    = $noteLines
     required = [bool]$Required
-} | ConvertTo-Json
+} | ConvertTo-Json -Depth 4
 [IO.File]::WriteAllText((Join-Path $out "update.json"), $manifest, (New-Object Text.UTF8Encoding($false)))
 
 Write-Host ""

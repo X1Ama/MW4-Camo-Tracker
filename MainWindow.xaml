@@ -1,0 +1,73 @@
+<Window x:Class="MasteryTracker.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Mastery Camo Tracker" Width="1200" Height="800" MinWidth="760" MinHeight="520"
+        WindowStartupLocation="CenterScreen" Background="{StaticResource Bg}">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="SideCol" Width="280"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Client list, staff only -->
+        <Border x:Name="SidePanel" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}"
+                BorderThickness="0,0,1,0">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="CLIENTS" FontFamily="{StaticResource Display}" FontSize="18"
+                           Foreground="{StaticResource Muted}" Margin="16,16,16,8"/>
+                <TextBox x:Name="ClientSearch" DockPanel.Dock="Top" Margin="12,0,12,10"
+                         TextChanged="ClientSearch_TextChanged"/>
+                <ListBox x:Name="ClientList" Background="Transparent" BorderThickness="0"
+                         DisplayMemberPath="Label" SelectionChanged="ClientList_SelectionChanged"/>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="24,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <DockPanel Grid.Row="0" Margin="0,18,0,0">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom">
+                    <TextBlock x:Name="UserText" Foreground="{StaticResource Muted}" FontSize="12"
+                               VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <Button x:Name="UpdateButton" Style="{StaticResource Chip}" Content="UPDATE AVAILABLE" FontSize="13" Padding="10,5" Margin="0,0,8,0" Visibility="Collapsed" Background="{StaticResource Accent}" Foreground="{StaticResource AccentFg}" BorderBrush="{StaticResource Accent}" Click="Update_Click"/>
+                    <Button x:Name="AdminButton" Style="{StaticResource Chip}" Content="ADMIN PANEL" FontSize="13" Padding="10,5" Margin="0,0,8,0" Visibility="Collapsed" Click="Admin_Click"/>
+                    <Button Style="{StaticResource Chip}" Content="SIGN OUT" FontSize="13" Padding="10,5"
+                            Click="SignOut_Click"/>
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock x:Name="KickerText" Text="MW4" Foreground="{StaticResource Muted}"
+                               FontFamily="{StaticResource Display}" FontSize="13"/>
+                    <TextBlock x:Name="TitleText" FontFamily="{StaticResource Display}" FontSize="30"
+                               Text="MASTERY CAMO TRACKER"/>
+                    <TextBlock x:Name="StatusText" Foreground="{StaticResource Muted}" FontSize="12"
+                               FontFamily="Consolas"/>
+                </StackPanel>
+            </DockPanel>
+
+            <StackPanel x:Name="Tabs" Grid.Row="1" Orientation="Horizontal" Margin="0,14,0,0"/>
+
+            <DockPanel Grid.Row="2" Margin="0,12,0,12">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <StackPanel x:Name="FilterPanel" Orientation="Horizontal" Margin="0,0,10,0"/>
+                    <TextBox x:Name="SearchBox" Width="190" TextChanged="SearchBox_TextChanged"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                    <ProgressBar x:Name="Progress" Width="260" Height="8" Minimum="0" Maximum="100"
+                                 Foreground="{StaticResource Accent}" Background="{StaticResource Panel2}"
+                                 BorderBrush="{StaticResource Line}" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="ProgressText" FontFamily="Consolas" FontSize="13" Margin="10,0,0,0"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </DockPanel>
+
+            <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="TrackerPanel" Margin="0,0,12,24"/>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,54 @@
+# Push a tag like v0.2.0 and GitHub builds the exe and publishes the release for you.
+#   git tag v0.2.0
+#   git push origin v0.2.0
+# To force everyone to update, edit update.json on the release and set "required": true.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Work out the version from the tag
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart("v")
+          "VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build
+        shell: pwsh
+        run: |
+          (Get-Content MasteryTracker.csproj -Raw) -replace '<Version>[^<]*</Version>', "<Version>$env:VERSION</Version>" |
+            Set-Content MasteryTracker.csproj -Encoding UTF8
+          dotnet publish MasteryTracker.csproj -c Release -r win-x64 -o out
+
+      - name: Write update.json
+        shell: pwsh
+        run: |
+          $repo = "${{ github.repository }}"
+          $manifest = [ordered]@{
+            version  = $env:VERSION
+            url      = "https://github.com/$repo/releases/latest/download/MasteryCamoTracker.exe"
+            notes    = "${{ github.event.head_commit.message }}".Split("`n")[0]
+            required = $false
+          } | ConvertTo-Json
+          Set-Content -Path out/update.json -Value $manifest -Encoding UTF8
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            out/MasteryCamoTracker.exe
+            out/update.json

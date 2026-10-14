@@ -77,6 +77,7 @@ public partial class MainWindow : Window
             var startup = ServerConfig.Load();
             if (startup.StartMinimized) WindowState = WindowState.Minimized;
             if (startup.LaunchAtStartup) StartupSettings.Apply(true);   // keeps the entry pointing at this exe
+            _ = Task.Run(StartMenuShortcut.Ensure);                      // so Windows Search can find the app
             var saved = ServerConfig.Load();
             if (saved.IsComplete && saved.RememberMe && SessionStore.Load() != null) loginPanel?.HideForm();
             _ = TryResumeAsync();
@@ -218,6 +219,7 @@ public partial class MainWindow : Window
             realtime.Detail = ApplyRemoteDetail;
             realtime.PresenceChanged += () => Dispatcher.BeginInvoke(RefreshPresenceUi);
             realtime.PeopleChanged += () => Dispatcher.BeginInvoke(OnPeopleChanged);
+            realtime.CameOnline += id => Dispatcher.BeginInvoke(() => OnClientOnline(id));
             realtime.TrackPresence(me.Id);
             realtime.ConnectionChanged += ok => Dispatcher.BeginInvoke(() => liveInstant = ok);
             if (!me.IsStaff) realtime.Watch(me.Id);
@@ -248,6 +250,7 @@ public partial class MainWindow : Window
         var root = (Grid)Content;
         foreach (var overlay in new UIElement?[] { adminPanel, passwordPanel, updatePanel, settingsPanel })
             if (overlay != null) root.Children.Remove(overlay);
+        if (toastHost != null) { root.Children.Remove(toastHost); toastHost = null; }
         adminPanel = null;
         passwordPanel = null;
         updatePanel = null;
@@ -391,6 +394,66 @@ public partial class MainWindow : Window
             ((Grid)Content).Children.Add(adminPanel);
         }
         adminPanel.Visibility = Visibility.Visible;
+    }
+
+    StackPanel? toastHost;
+
+    /// <summary>A small banner in the corner of the window: "Kam opened the tracker".</summary>
+    void OnClientOnline(string id)
+    {
+        if (me == null || !me.IsStaff) return;
+        if (!ServerConfig.Load().NotifyOnline) return;
+        var who = clients.FirstOrDefault(c => c.Id == id);
+        if (who == null) return;                      // not one of this person's clients
+
+        if (toastHost == null)
+        {
+            toastHost = new StackPanel
+            {
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Margin = new Thickness(0, 0, 20, 20),
+            };
+            Grid.SetColumnSpan(toastHost, 2);
+            System.Windows.Controls.Panel.SetZIndex(toastHost, 40);
+            ((Grid)Content).Children.Add(toastHost);
+        }
+
+        var line = new StackPanel { Orientation = Orientation.Horizontal };
+        line.Children.Add(new System.Windows.Shapes.Ellipse
+        {
+            Width = 9, Height = 9, Fill = new SolidColorBrush(Color.FromRgb(0x3D, 0xDC, 0x84)),
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0),
+        });
+        line.Children.Add(new TextBlock { Text = who.Label, FontWeight = FontWeights.SemiBold, FontSize = 14 });
+        line.Children.Add(new TextBlock
+        {
+            Text = "  opened the tracker", FontSize = 14, Foreground = Res("Muted"),
+        });
+        var toast = new Border
+        {
+            Background = Res("Panel2"),
+            BorderBrush = Res("Line"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(14, 10, 16, 10),
+            Margin = new Thickness(0, 0, 0, 8),
+            Opacity = 0,
+            Cursor = Cursors.Hand,
+            Child = line,
+        };
+        void Close()
+        {
+            var fade = new System.Windows.Media.Animation.DoubleAnimation(0, TimeSpan.FromMilliseconds(250));
+            fade.Completed += (_, _) => toastHost?.Children.Remove(toast);
+            toast.BeginAnimation(OpacityProperty, fade);
+        }
+        toast.MouseLeftButtonDown += (_, _) => Close();
+        toastHost.Children.Add(toast);
+        toast.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(1, TimeSpan.FromMilliseconds(180)));
+        var life = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+        life.Tick += (_, _) => { life.Stop(); if (toastHost?.Children.Contains(toast) == true) Close(); };
+        life.Start();
     }
 
     int peopleTicket;
@@ -792,7 +855,9 @@ public partial class MainWindow : Window
                 Foreground = Res("Muted"),
             });
             TrackerPanel.Children.Add(head);
-            foreach (var r in rows) TrackerPanel.Children.Add(r);
+            var cards = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+            foreach (var r in rows) cards.Children.Add(r);
+            TrackerPanel.Children.Add(cards);
         }
 
         if (TrackerPanel.Children.Count == 0)
@@ -815,15 +880,25 @@ public partial class MainWindow : Window
         ProgressText.Text = $"{done} / {total}  \u00B7  {pct}%";
     }
 
+    static string Initials(string label) =>
+        string.Concat(label.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(p => char.ToUpperInvariant(p[0])));
+
+    /// <summary>One weapon as a card: its name and level on top, a strip of camo tiles underneath.</summary>
     UIElement BuildRow(Row w, List<(string Id, string Label, bool Track)> chips, int d, bool all)
     {
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(250) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var body = new StackPanel();
 
-        // left: name, count, type picker, level
-        var left = new StackPanel { Margin = new Thickness(0, 0, 14, 0) };
-        var title = new DockPanel();
+        // name (with the remove button for hand-added weapons)
+        var title = new Grid();
+        title.Children.Add(new TextBlock
+        {
+            Text = w.Name.ToUpperInvariant(),
+            FontFamily = DisplayFont,
+            FontSize = 20,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            Margin = new Thickness(22, 0, 22, 0),
+        });
         if (CanEdit && w.CustomId != null)
         {
             var rm = new Button
@@ -834,6 +909,8 @@ public partial class MainWindow : Window
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(0),
                 ToolTip = "Remove weapon",
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
             };
             var id = w.CustomId;
             var snapshot = data.Customs.First(c => c.Id == id);
@@ -841,23 +918,17 @@ public partial class MainWindow : Window
                 () => data.Customs.RemoveAll(c => c.Id == id),
                 () => data.Customs.Add(snapshot),
                 () => api.RemoveCustomAsync(id));
-            DockPanel.SetDock(rm, Dock.Right);
             title.Children.Add(rm);
         }
-        title.Children.Add(new TextBlock
-        {
-            Text = w.Name.ToUpperInvariant(),
-            FontFamily = DisplayFont,
-            FontSize = 21,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-        });
-        left.Children.Add(title);
-        left.Children.Add(new TextBlock
+        body.Children.Add(title);
+        body.Children.Add(new TextBlock
         {
             Text = $"{d}/{chips.Count} camos",
             FontFamily = Mono,
             FontSize = 11,
             Foreground = Res("Muted"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 2),
         });
 
         if (CanEdit && !w.Fixed)
@@ -877,27 +948,34 @@ public partial class MainWindow : Window
                     () => { if (old.Length > 0) data.Classes[w.Key] = old; else data.Classes.Remove(w.Key); },
                     () => api.SetClassAsync(target!.Id, w.Key, code));
             };
-            left.Children.Add(combo);
+            body.Children.Add(combo);
         }
 
-        left.Children.Add(BuildLevel(w));
-        Grid.SetColumn(left, 0);
-        grid.Children.Add(left);
+        body.Children.Add(BuildLevel(w));
 
-        // right: camo buttons
-        var wrap = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+        // the camo tiles: initials on a square, yellow when ticked, full name on hover
+        var strip = new System.Windows.Controls.Primitives.UniformGrid { Rows = 1, Margin = new Thickness(0, 12, 0, 0) };
         foreach (var c in chips)
         {
             bool on = data.Ticks.Contains(c.Id);
             var b = new Button
             {
                 Style = (Style)FindResource("Chip"),
-                Content = (on ? "\u2713  " : "\u25C7  ") + c.Label.ToUpperInvariant(),
-                Width = 226,
-                Margin = new Thickness(0, 0, 6, 6),
+                Content = new TextBlock
+                {
+                    Text = on ? "\u2713" : Initials(c.Label),
+                    FontFamily = Mono,
+                    FontSize = on ? 15 : 12,
+                    FontWeight = FontWeights.SemiBold,
+                },
+                Height = 38,
+                Padding = new Thickness(0),
+                Margin = new Thickness(0, 0, 4, 0),
+                HorizontalContentAlignment = HorizontalAlignment.Center,
                 Background = on ? Res("Accent") : Res("Panel2"),
                 Foreground = on ? Res("AccentFg") : Res("Fg"),
                 BorderBrush = on ? Res("Accent") : Res("Line"),
+                ToolTip = c.Label,
                 IsHitTestVisible = CanEdit,
             };
             var cid = c.Id;
@@ -909,14 +987,15 @@ public partial class MainWindow : Window
                     () => { if (now) data.Ticks.Remove(cid); else data.Ticks.Add(cid); },
                     () => api.SetTickAsync(target!.Id, cid, now));
             };
-            wrap.Children.Add(b);
+            strip.Children.Add(b);
         }
-        Grid.SetColumn(wrap, 1);
-        grid.Children.Add(wrap);
+        body.Children.Add(strip);
 
-        return Panel(grid, all ? Res("Accent") : null);
+        var card = Panel(body, all ? Res("Accent") : null);
+        card.Width = 270;
+        card.Margin = new Thickness(0, 10, 10, 0);
+        return card;
     }
-
     UIElement BuildLevel(Row w)
     {
         int lv = Math.Min(Catalog.MaxLevel, data.Levels.GetValueOrDefault(w.Key, 0));
@@ -937,8 +1016,7 @@ public partial class MainWindow : Window
         var track = new Grid { Height = 10, Background = Res("Panel2"), Cursor = CanEdit ? Cursors.Hand : Cursors.Arrow };
         var fill = new Border
         {
-            Background = Res("Fg"),
-            Opacity = .8,
+            Background = Res("Accent"),
             CornerRadius = new CornerRadius(3),
             HorizontalAlignment = HorizontalAlignment.Left,
         };
@@ -1006,8 +1084,39 @@ public partial class MainWindow : Window
             g.Children.Add(levelBox);
 
             track.Background = Res("Panel2");
+            // press and drag along the bar to scrub the level; it is saved once, when the mouse is let go
+            bool scrubbing = false;
+            int LevelAt(MouseEventArgs e) =>
+                Math.Clamp((int)Math.Round(e.GetPosition(track).X / Math.Max(1, track.ActualWidth) * Catalog.MaxLevel), 0, Catalog.MaxLevel);
+            void Preview(int v)
+            {
+                fill.Width = track.ActualWidth * v / Catalog.MaxLevel;
+                input.Text = v.ToString();
+            }
             track.MouseLeftButtonDown += (_, e) =>
-                SetLevel((int)Math.Round(e.GetPosition(track).X / Math.Max(1, track.ActualWidth) * Catalog.MaxLevel));
+            {
+                scrubbing = true;
+                track.CaptureMouse();
+                Preview(LevelAt(e));
+                e.Handled = true;
+            };
+            track.MouseMove += (_, e) =>
+            {
+                if (scrubbing) Preview(LevelAt(e));
+            };
+            track.MouseLeftButtonUp += (_, e) =>
+            {
+                if (!scrubbing) return;
+                scrubbing = false;
+                track.ReleaseMouseCapture();
+                SetLevel(LevelAt(e));
+            };
+            track.LostMouseCapture += (_, _) =>
+            {
+                if (!scrubbing) return;
+                scrubbing = false;
+                Preview(lv);          // capture was taken away: put the bar back
+            };
 
             var btns = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 0, 0, 0) };
             foreach (var (text, delta) in new[] { ("\u2212", -1), ("+", 1) })

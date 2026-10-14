@@ -14,6 +14,7 @@ public partial class SettingsPanel : UserControl
     public SettingsPanel(Profile me)
     {
         InitializeComponent();
+        NotifyRow.Visibility = me.IsStaff ? Visibility.Visible : Visibility.Collapsed;
         WhoText.Text = $"{me.Label}  \u00B7  {Catalog.RoleLabel(me.Role)}  \u00B7  v{Updater.CurrentText}";
         Reload();
     }
@@ -25,6 +26,7 @@ public partial class SettingsPanel : UserControl
         var cfg = ServerConfig.Load();
         MinimizedCheck.IsChecked = cfg.StartMinimized;
         StartupCheck.IsChecked = cfg.LaunchAtStartup;
+        NotifyCheck.IsChecked = cfg.NotifyOnline;
         loading = false;
     }
 
@@ -41,6 +43,12 @@ public partial class SettingsPanel : UserControl
     {
         if (loading) return;
         Store(c => c.StartMinimized = MinimizedCheck.IsChecked == true);
+    }
+
+    void Notify_Changed(object sender, RoutedEventArgs e)
+    {
+        if (loading) return;
+        Store(c => c.NotifyOnline = NotifyCheck.IsChecked == true);
     }
 
     void Startup_Changed(object sender, RoutedEventArgs e)

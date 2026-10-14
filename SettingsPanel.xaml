@@ -20,6 +20,13 @@
                 <TextBlock Text="The app opens in the taskbar instead of in front of you." Foreground="{StaticResource Muted}"
                            FontSize="12" Margin="30,0,0,24" TextWrapping="Wrap"/>
 
+                <StackPanel x:Name="NotifyRow" Visibility="Collapsed">
+                    <CheckBox x:Name="NotifyCheck" Style="{StaticResource RememberBox}" Content="Tell me when a client comes online"
+                              Checked="Notify_Changed" Unchecked="Notify_Changed" Margin="0,0,0,2"/>
+                    <TextBlock Text="A small banner appears in the tracker when somebody opens the app." Foreground="{StaticResource Muted}"
+                               FontSize="12" Margin="30,0,0,24" TextWrapping="Wrap"/>
+                </StackPanel>
+
                 <TextBlock Text="ACCOUNT" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,0,0,10"/>
                 <UniformGrid Columns="2">
                     <Button Style="{StaticResource Chip}" Content="CHANGE PASSWORD" Padding="12,9" FontSize="14"

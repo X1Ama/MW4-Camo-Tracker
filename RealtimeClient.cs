@@ -45,6 +45,9 @@ public sealed class RealtimeClient : IDisposable
     /// <summary>Raised when somebody opens or closes the app.</summary>
     public event Action? PresenceChanged;
 
+    /// <summary>Raised with the person's id when somebody who was not online opens the app.</summary>
+    public event Action<string>? CameOnline;
+
     /// <summary>Raised when an admin changed roles, names or assignments somewhere.</summary>
     public event Action? PeopleChanged;
 
@@ -108,6 +111,7 @@ public sealed class RealtimeClient : IDisposable
     {
         if (!root.TryGetProperty("payload", out var p) || p.ValueKind != JsonValueKind.Object) return;
         var set = new HashSet<string>(Presence.Online);
+        var fresh = new List<string>();
         if (ev == "presence_state")
         {
             set.Clear();
@@ -118,11 +122,17 @@ public sealed class RealtimeClient : IDisposable
             if (p.TryGetProperty("leaves", out var lv) && lv.ValueKind == JsonValueKind.Object)
                 foreach (var k in lv.EnumerateObject()) set.Remove(k.Name);
             if (p.TryGetProperty("joins", out var jn) && jn.ValueKind == JsonValueKind.Object)
-                foreach (var k in jn.EnumerateObject()) set.Add(k.Name);
+                foreach (var k in jn.EnumerateObject())
+                {
+                    bool wasOnline = Presence.Online.Contains(k.Name);
+                    set.Add(k.Name);
+                    if (!wasOnline && k.Name != presenceKey) fresh.Add(k.Name);
+                }
         }
         else return;
         Presence.Replace(set);
         PresenceChanged?.Invoke();
+        foreach (var id in fresh) CameOnline?.Invoke(id);
     }
     public event Action<bool>? ConnectionChanged;
 

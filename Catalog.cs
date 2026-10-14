@@ -5,6 +5,18 @@ public sealed record Profile(string Id, string Email, string DisplayName, string
 {
     public string Label => Catalog.Cap(string.IsNullOrWhiteSpace(DisplayName) ? Email.Replace(Catalog.UserDomain, "") : DisplayName);
     public bool IsStaff => Role is "admin" or "owner";
+    /// <summary>
+    /// The user name as it should be written. User names are stored in lower case, so when the display name is the
+    /// same word (ignoring case), its capitals are used; otherwise just the first letter is raised.
+    /// </summary>
+    public string UserName
+    {
+        get
+        {
+            var u = Email.Replace(Catalog.UserDomain, "");
+            return string.Equals(u, DisplayName, StringComparison.OrdinalIgnoreCase) ? DisplayName : Catalog.Cap(u);
+        }
+    }
     public string RoleLabel => Catalog.RoleLabel(Role);
 }
 public sealed record CustomWeapon(string Id, string Name, string Cls);

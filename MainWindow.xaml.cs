@@ -580,6 +580,16 @@ public partial class MainWindow : Window
 
         // Weapons are added in Catalog.cs by the app's maintainer, so there is no "Add weapon" box here.
 
+        TrackerPanel.Children.Add(new TextBlock
+        {
+            Text = "By X1Ama",
+            Foreground = Res("Muted"),
+            FontFamily = Mono,
+            FontSize = 12,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 28, 0, 4),
+        });
+
         int pct = total == 0 ? 0 : (int)Math.Round(done * 100.0 / total);
         Progress.Value = pct;
         ProgressText.Text = $"{done} / {total}  \u00B7  {pct}%";

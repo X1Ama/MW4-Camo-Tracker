@@ -107,7 +107,7 @@ public partial class AdminPanel : UserControl
         DetailPanel.Visibility = Visibility.Visible;
         CreatePanel.Visibility = Visibility.Collapsed;
         DetailTitle.Text = selected.Label;
-        DetailSub.Text = $"{Catalog.Cap(selected.Email.Replace(Catalog.UserDomain, ""))}  \u00B7  {Catalog.RoleLabel(selected.Role)}";
+        DetailSub.Text = $"{selected.UserName}  \u00B7  {Catalog.RoleLabel(selected.Role)}";
         loadingDetail = true;
         DetailName.Text = selected.DisplayName;
         DetailPass.Text = "";

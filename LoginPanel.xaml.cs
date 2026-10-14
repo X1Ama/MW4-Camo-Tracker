@@ -1,15 +1,19 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 
 namespace MasteryTracker;
 
-public partial class LoginWindow : Window
+public partial class LoginPanel : UserControl
 {
     readonly ServerConfig cfg = ServerConfig.Load();
+    Api? api;
 
-    public LoginWindow()
+    /// <summary>Raised with the signed-in connection and person; the main window takes over from here.</summary>
+    public event Action<Api, Profile>? SignedIn;
+
+    public LoginPanel()
     {
-        TitleBar.Apply(this);
         InitializeComponent();
         EmailBox.Text = cfg.LastEmail;
         VersionText.Text = "v" + Updater.CurrentText;
@@ -23,6 +27,33 @@ public partial class LoginWindow : Window
         Loaded += async (_, _) => await CheckForUpdateAsync();
         GotKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(UpdateHints, System.Windows.Threading.DispatcherPriority.Input);
         LostKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(UpdateHints, System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    /// <summary>Called whenever the sign-in screen is shown (first start, and after signing out).</summary>
+    public void Reset()
+    {
+        PasswordBox.Password = "";
+        PlainBox.Text = "";
+        if (PlainBox.Visibility == Visibility.Visible)
+        {
+            PasswordBox.Visibility = Visibility.Visible;
+            PlainBox.Visibility = Visibility.Collapsed;
+            EyeSlash.Visibility = Visibility.Collapsed;
+            ShowButton.ToolTip = "Show password";
+        }
+        ErrorText.Visibility = Visibility.Collapsed;
+        SignInButton.Content = "SIGN IN";
+        SignInButton.IsEnabled = !(pending?.Required ?? false);
+        EmailBox.Text = cfg.LastEmail;
+        api = null;
+        if (cfg.IsComplete)
+        {
+            api = new Api(cfg);
+            _ = api.WarmUpAsync();   // the connection is ready by the time they press Sign in
+        }
+        UpdateHints();
+        Dispatcher.BeginInvoke(() => (EmailBox.Text.Length == 0 ? (UIElement)EmailBox : PasswordBox).Focus(),
+            System.Windows.Threading.DispatcherPriority.Input);
     }
 
     UpdateInfo? pending;
@@ -47,7 +78,7 @@ public partial class LoginWindow : Window
     {
         if (pending == null) return;
         UpdateButton.IsEnabled = false;
-        UpdateButton.Content = "DOWNLOADING…";
+        UpdateButton.Content = "DOWNLOADING\u2026";
         UpdateProgress.Visibility = Visibility.Visible;
         try
         {
@@ -137,16 +168,18 @@ public partial class LoginWindow : Window
         }
 
         SignInButton.IsEnabled = false;
-        SignInButton.Content = "SIGNING IN…";
+        SignInButton.Content = "SIGNING IN\u2026";
+        Timing.Start("sign-in pressed");
         try
         {
-            var api = new Api(cfg);
+            api ??= new Api(cfg);
             var me = await api.SignInAsync(user.ToLowerInvariant() + Catalog.UserDomain, Pw);
+            Timing.Mark("server accepted the sign-in (login + profile)");
             cfg.LastEmail = user;
             cfg.Save();
-            var main = new MainWindow(api, me);
-            main.Show();
-            Close();
+            var session = api;
+            api = null;                 // the main window owns this connection now
+            SignedIn?.Invoke(session, me);
         }
         catch (ApiException ex) when (ex.Status is 400 or 401)
         {

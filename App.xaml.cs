@@ -35,6 +35,6 @@ public partial class App : Application
             return;
         }
 
-        new LoginWindow().Show();
+        new MainWindow().Show();
     }
 }

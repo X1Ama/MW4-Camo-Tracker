@@ -1,5 +1,6 @@
 - Changes appear on your friend's screen almost instantly instead of after several seconds
-- The admin panel now opens inside the main window, and the Admin role is called Grinder
+- The sign-in screen is now part of the app window, and signing in is quicker
+- The admin panel opens inside the main window, and the Admin role is called Grinder
 - Clients can tick their own camos, set weapon levels and change their own password
 - Weapon levels can be typed in, and the app has a new yellow logo and rounder look
-- Lighter on memory and network, and the update screen now shows these notes
+- Lighter on memory and network, and this update screen now shows patch notes

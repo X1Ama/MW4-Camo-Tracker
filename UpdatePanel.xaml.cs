@@ -18,8 +18,8 @@ public partial class UpdatePanel : UserControl
     public void Show(UpdateInfo update)
     {
         info = update;
-        VersionText.Text = $"Version {Updater.CurrentText}  →  {update.Version.Major}.{update.Version.Minor}.{update.Version.Build}"
-            + (update.Required ? "   ·   required" : "");
+        VersionText.Text = $"Version {Updater.CurrentText}  \u2192  {update.Version.Major}.{update.Version.Minor}.{update.Version.Build}"
+            + (update.Required ? "   \u00B7   required" : "");
         NotesList.ItemsSource = update.Highlights;
         NoNotesText.Visibility = update.Highlights.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         LaterButton.Visibility = update.Required ? Visibility.Collapsed : Visibility.Visible;
@@ -37,7 +37,7 @@ public partial class UpdatePanel : UserControl
         if (info == null) return;
         UpdateButton.IsEnabled = false;
         LaterButton.IsEnabled = false;
-        UpdateButton.Content = "DOWNLOADING…";
+        UpdateButton.Content = "DOWNLOADING\u2026";
         Progress.Value = 0;
         Progress.Visibility = Visibility.Visible;
         MessageText.Visibility = Visibility.Collapsed;

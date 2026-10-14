@@ -10,8 +10,8 @@ public partial class MainWindow : Window
 {
     sealed record Row(string Key, string Name, string Cls, bool Fixed, string? CustomId);
 
-    readonly Api api;
-    readonly Profile me;
+    Api api = null!;
+    Profile me = null!;
     readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(10) };
     List<Profile> clients = new();
     Profile? target;
@@ -40,54 +40,145 @@ public partial class MainWindow : Window
 
     static FontFamily DisplayFont => (FontFamily)Application.Current.Resources["Display"];
 
-    public MainWindow(Api api, Profile me)
+    readonly DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromMinutes(30) };
+    LoginPanel? loginPanel;
+
+    public MainWindow()
     {
-        this.api = api;
-        this.me = me;
         TitleBar.Apply(this);
         InitializeComponent();
-        AdminButton.Visibility = me.IsStaff ? Visibility.Visible : Visibility.Collapsed;
-        UserText.Text = $"{me.Label}  ·  {Catalog.RoleLabel(me.Role)}  ·  v{Updater.CurrentText}";
-
         BuildTabs();
         BuildFilters();
 
-        if (!me.IsStaff)
-        {
-            SidePanel.Visibility = Visibility.Collapsed;
-            SideCol.Width = new GridLength(0);
-            target = me;
-            Loaded += (_, _) => realtime?.Watch(me.Id);
-        }
-
         timer.Tick += async (_, _) =>
         {
+            if (api == null) return;
             // Fast safety-net polling until the server confirms live updates are working.
             bool idle = !IsActive || WindowState == WindowState.Minimized;
             timer.Interval = TimeSpan.FromSeconds(liveInstant ? (idle ? 120 : 30) : (idle ? 10 : 2));
             if (inflight == 0) await RefreshAsync();
         };
-        Loaded += async (_, _) =>
-        {
-            if (me.IsStaff) await LoadClientsAsync();
-            else { UpdateTitle(); await RefreshAsync(); }
-            timer.Start();
-        };
-        Closed += (_, _) => { timer.Stop(); searchDebounce.Stop(); realtime?.Dispose(); };
         searchDebounce.Tick += (_, _) => { searchDebounce.Stop(); Render(); };
+        updateTimer.Tick += async (_, _) => await CheckUpdateAsync();
+        Closed += (_, _) => { timer.Stop(); searchDebounce.Stop(); updateTimer.Stop(); realtime?.Dispose(); };
+
+        ShowLogin();
+    }
+
+    /// <summary>Opens straight into a session, used by the offline demo modes.</summary>
+    public MainWindow(Api api, Profile me) : this()
+    {
+        HideLogin();
+        StartSession(api, me);
+    }
+
+    // ---- sign-in lives inside this window --------------------------------------
+
+    void ShowLogin()
+    {
+        if (loginPanel == null)
+        {
+            loginPanel = new LoginPanel();
+            Grid.SetColumnSpan(loginPanel, 2);
+            System.Windows.Controls.Panel.SetZIndex(loginPanel, 100);
+            loginPanel.SignedIn += (a, p) => StartSession(a, p);
+            ((Grid)Content).Children.Add(loginPanel);
+        }
+        loginPanel.Visibility = Visibility.Visible;
+        loginPanel.Reset();
+    }
+
+    void HideLogin()
+    {
+        if (loginPanel == null) return;
+        ((Grid)Content).Children.Remove(loginPanel);
+        loginPanel = null;
+    }
+
+    void StartSession(Api newApi, Profile newMe)
+    {
+        Timing.Mark("main screen taking over");
+        api = newApi;
+        me = newMe;
+        if (loginPanel != null) loginPanel.Visibility = Visibility.Collapsed;
+
+        clients = new();
+        target = null;
+        data = new ClientData();
+        lastSig = "";
+        inflight = 0;
+        liveInstant = false;
+        pendingUpdate = null;
+        UpdateButton.Visibility = Visibility.Collapsed;
+        query = "";
+        SearchBox.Text = "";
+        filter = "all";
+        modeId = Catalog.Modes[0].Id;
+        BuildFilters();
+        BuildTabs();
+
+        AdminButton.Visibility = me.IsStaff ? Visibility.Visible : Visibility.Collapsed;
+        UserText.Text = $"{me.Label}  \u00B7  {Catalog.RoleLabel(me.Role)}  \u00B7  v{Updater.CurrentText}";
+        if (me.IsStaff)
+        {
+            SidePanel.Visibility = Visibility.Visible;
+            SideCol.Width = new GridLength(280);
+            ClientList.ItemsSource = null;
+        }
+        else
+        {
+            SidePanel.Visibility = Visibility.Collapsed;
+            SideCol.Width = new GridLength(0);
+            target = me;
+        }
+        TrackerPanel.Children.Clear();
+        UpdateTitle();
+        SetStatus("Loading\u2026", true);
+
         if (api.SupportsRealtime)
         {
             realtime = new RealtimeClient(api.Config.Url, api.Config.AnonKey, api.GetAccessTokenAsync);
             realtime.Changed += OnRemoteChange;
             realtime.ConnectionChanged += ok => Dispatcher.BeginInvoke(() => liveInstant = ok);
+            if (!me.IsStaff) realtime.Watch(me.Id);
         }
-        _ = CheckUpdateAsync();
-        var updateTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
-        updateTimer.Tick += async (_, _) => await CheckUpdateAsync();
+
+        timer.Interval = TimeSpan.FromSeconds(2);
+        timer.Start();
         updateTimer.Start();
-        Closed += (_, _) => updateTimer.Stop();
+        _ = CheckUpdateAsync();
+        _ = BeginSessionAsync();
     }
 
+    async Task BeginSessionAsync()
+    {
+        if (me.IsStaff) await LoadClientsAsync();
+        else await InitialLoadAsync();
+    }
+
+    void EndSession()
+    {
+        timer.Stop();
+        updateTimer.Stop();
+        searchDebounce.Stop();
+        realtime?.Dispose();
+        realtime = null;
+
+        var root = (Grid)Content;
+        foreach (var overlay in new UIElement?[] { adminPanel, passwordPanel, updatePanel })
+            if (overlay != null) root.Children.Remove(overlay);
+        adminPanel = null;
+        passwordPanel = null;
+        updatePanel = null;
+
+        TrackerPanel.Children.Clear();
+        ClientList.ItemsSource = null;
+        clients = new();
+        data = new ClientData();
+        target = null;
+        api = null!;
+        me = null!;
+    }
     // ---- chrome ---------------------------------------------------------------
 
     void BuildTabs()
@@ -139,8 +230,8 @@ public partial class MainWindow : Window
 
     void UpdateTitle()
     {
-        TitleText.Text = target == null ? "MASTERY CAMO TRACKER" : target.Label;
-        KickerText.Text = me.IsStaff ? "MW4 · MANAGING" : "MW4 · MASTERY CAMO TRACKER";
+        TitleText.Text = target == null ? "MW4 CAMO TRACKER" : target.Label;
+        KickerText.Text = me.IsStaff ? "MANAGING" : "MW4 CAMO TRACKER";
     }
 
     UpdateInfo? pendingUpdate;
@@ -209,9 +300,8 @@ public partial class MainWindow : Window
 
     void SignOut_Click(object sender, RoutedEventArgs e)
     {
-        timer.Stop();
-        new LoginWindow().Show();
-        Close();
+        EndSession();
+        ShowLogin();
     }
 
     readonly DispatcherTimer searchDebounce = new() { Interval = TimeSpan.FromMilliseconds(150) };
@@ -223,13 +313,53 @@ public partial class MainWindow : Window
         searchDebounce.Start();
     }
 
+    DateTime lastFullLoad = DateTime.MinValue;
+
+    /// <summary>The client list that was requested during sign-in, or a fresh request if that one failed.</summary>
+    async Task<List<Profile>> TakeClientsAsync()
+    {
+        var t = api.PrefetchedClients;
+        api.PrefetchedClients = null;
+        if (t != null)
+        {
+            try { return await t; } catch { /* fall through and ask again */ }
+        }
+        return await api.GetManagedClientsAsync();
+    }
+
+    /// <summary>A client's first screen: use the data requested during sign-in when there is some.</summary>
+    async Task InitialLoadAsync()
+    {
+        var pre = api.PrefetchedOwnData;
+        api.PrefetchedOwnData = null;
+        if (pre != null)
+        {
+            try
+            {
+                var d = await pre;
+                data = d;
+                lastSig = d.Signature();
+                lastFullLoad = DateTime.UtcNow;
+                Timing.Mark("own data received");
+                Render();
+                Timing.Mark("first screen drawn");
+                Timing.Finish();
+                SetStatus("Live \u00B7 checked " + DateTime.Now.ToString("HH:mm:ss"), true);
+                return;
+            }
+            catch { /* ask again below */ }
+        }
+        await RefreshAsync();
+    }
+
     // ---- clients (staff) ------------------------------------------------------
 
     async Task LoadClientsAsync()
     {
         try
         {
-            clients = await api.GetManagedClientsAsync();
+            clients = await TakeClientsAsync();
+            Timing.Mark("client list received");
             ApplyClientFilter();
             if (clients.Count == 0)
                 SetStatus("No clients assigned to you yet. Ask an owner to assign some.", false);
@@ -281,6 +411,8 @@ public partial class MainWindow : Window
     {
         Dispatcher.BeginInvoke(async () =>
         {
+            // the "just connected" ping right after a fresh load would only repeat it
+            if (table == null && (DateTime.UtcNow - lastFullLoad).TotalSeconds < 4) return;
             if (table == null) pendingFull = true; else pendingTables.Add(table);
             int ticket = Interlocked.Increment(ref remoteTicket);
             await Task.Delay(120);
@@ -304,17 +436,21 @@ public partial class MainWindow : Window
             await api.LoadAsync(who.Id, fresh, only);
             if (inflight > 0 || who.Id != target?.Id) return;
             var sig = fresh.Signature();
+            if (only == null) lastFullLoad = DateTime.UtcNow;
             if (sig != lastSig)
             {
                 data = fresh;
                 lastSig = sig;
+                Timing.Mark("client data received");
                 Render();
+                Timing.Mark("first screen drawn");
+                Timing.Finish();
             }
-            SetStatus((liveInstant ? "Live (instant) · " : "Live · ") + "checked " + DateTime.Now.ToString("HH:mm:ss"), true);
+            SetStatus((liveInstant ? "Live (instant) \u00B7 " : "Live \u00B7 ") + "checked " + DateTime.Now.ToString("HH:mm:ss"), true);
         }
         catch (Exception ex)
         {
-            SetStatus("Offline, retrying… " + ex.Message, false);
+            SetStatus("Offline, retrying\u2026 " + ex.Message, false);
         }
     }
 
@@ -376,6 +512,7 @@ public partial class MainWindow : Window
 
     void Render()
     {
+        if (me == null || api == null) return;
         TrackerPanel.Children.Clear();
         if (target == null)
         {
@@ -445,7 +582,7 @@ public partial class MainWindow : Window
 
         int pct = total == 0 ? 0 : (int)Math.Round(done * 100.0 / total);
         Progress.Value = pct;
-        ProgressText.Text = $"{done} / {total}  ·  {pct}%";
+        ProgressText.Text = $"{done} / {total}  \u00B7  {pct}%";
     }
 
     UIElement BuildRow(Row w, List<(string Id, string Label, bool Track)> chips, int d, bool all)
@@ -462,7 +599,7 @@ public partial class MainWindow : Window
             var rm = new Button
             {
                 Style = (Style)FindResource("Chip"),
-                Content = "×",
+                Content = "\u00D7",
                 Padding = new Thickness(7, 0, 7, 2),
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(0),
@@ -496,7 +633,7 @@ public partial class MainWindow : Window
         if (CanEdit && !w.Fixed)
         {
             var combo = new ComboBox { Margin = new Thickness(0, 6, 0, 0), FontSize = 12 };
-            combo.Items.Add(new ComboBoxItem { Content = "Set type…", Tag = "" });
+            combo.Items.Add(new ComboBoxItem { Content = "Set type\u2026", Tag = "" });
             foreach (var c in Catalog.Classes) combo.Items.Add(new ComboBoxItem { Content = c.Name, Tag = c.Code });
             combo.SelectedIndex = Math.Max(0, Array.FindIndex(Catalog.Classes, c => c.Code == w.Cls) + 1);
             combo.SelectionChanged += (_, _) =>
@@ -525,7 +662,7 @@ public partial class MainWindow : Window
             var b = new Button
             {
                 Style = (Style)FindResource("Chip"),
-                Content = (on ? "✓  " : "◇  ") + c.Label.ToUpperInvariant(),
+                Content = (on ? "\u2713  " : "\u25C7  ") + c.Label.ToUpperInvariant(),
                 Width = 226,
                 Margin = new Thickness(0, 0, 6, 6),
                 Background = on ? Res("Accent") : Res("Panel2"),
@@ -643,7 +780,7 @@ public partial class MainWindow : Window
                 SetLevel((int)Math.Round(e.GetPosition(track).X / Math.Max(1, track.ActualWidth) * Catalog.MaxLevel));
 
             var btns = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 0, 0, 0) };
-            foreach (var (text, delta) in new[] { ("−", -1), ("+", 1) })
+            foreach (var (text, delta) in new[] { ("\u2212", -1), ("+", 1) })
             {
                 var b = new Button
                 {

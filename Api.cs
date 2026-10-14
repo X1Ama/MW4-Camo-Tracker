@@ -95,7 +95,13 @@ public class Api
     {
         AutomaticDecompression = DecompressionMethods.All,
         PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-    }) { Timeout = TimeSpan.FromSeconds(20) };
+        EnableMultipleHttp2Connections = true,
+    })
+    {
+        Timeout = TimeSpan.FromSeconds(20),
+        DefaultRequestVersion = HttpVersion.Version20,
+        DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
+    };
     readonly ServerConfig cfg;
     string? access, refresh;
     DateTime expiresUtc;
@@ -103,6 +109,23 @@ public class Api
     public string UserId { get; private set; } = "";
 
     public ServerConfig Config => cfg;
+
+    /// <summary>Started during sign-in, in parallel with the profile lookup, and picked up by the main window.</summary>
+    public Task<List<Profile>>? PrefetchedClients { get; set; }
+    public Task<ClientData>? PrefetchedOwnData { get; set; }
+
+    /// <summary>Opens the connection (DNS, TLS) while the person is still typing, so sign-in starts warm.</summary>
+    public virtual async Task WarmUpAsync()
+    {
+        try { await SendAsync(HttpMethod.Get, "/auth/v1/health", needAuth: false); } catch { /* best effort */ }
+    }
+
+    async Task<ClientData> LoadOwnAsync(string id)
+    {
+        var d = new ClientData();
+        await LoadAsync(id, d);
+        return d;
+    }
 
     /// <summary>False for the offline demo, which has no server to listen to.</summary>
     public virtual bool SupportsRealtime => true;
@@ -166,6 +189,10 @@ public class Api
         var body = await SendAsync(HttpMethod.Post, "/auth/v1/token?grant_type=password",
             JsonSerializer.Serialize(new { email, password }), needAuth: false);
         ReadSession(body);
+        Timing.Mark("login answered (password checked)");
+        // Everything the main window needs next goes out at once, instead of one request after another.
+        PrefetchedClients = GetManagedClientsAsync();
+        PrefetchedOwnData = LoadOwnAsync(UserId);
         var rows = await GetProfilesAsync($"?id=eq.{UserId}&select=id,email,display_name,role");
         return rows.FirstOrDefault() ?? throw new ApiException(404,
             "This account has no profile row. Run the setup SQL and sign in again.");

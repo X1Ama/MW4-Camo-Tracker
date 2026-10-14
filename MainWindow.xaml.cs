@@ -40,7 +40,7 @@ public partial class MainWindow : Window
 
     static FontFamily DisplayFont => (FontFamily)Application.Current.Resources["Display"];
 
-    readonly DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromMinutes(30) };
+    readonly DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromMinutes(3) };
     LoginPanel? loginPanel;
     bool trimmed;
 
@@ -64,11 +64,19 @@ public partial class MainWindow : Window
         };
         searchDebounce.Tick += (_, _) => { searchDebounce.Stop(); Render(); };
         updateTimer.Tick += async (_, _) => await CheckUpdateAsync();
+        // coming back to the window is a good moment to look for a new version too
+        Activated += async (_, _) =>
+        {
+            if (api != null && (DateTime.UtcNow - lastUpdateCheck).TotalSeconds > 60) await CheckUpdateAsync();
+        };
         Closed += (_, _) => { timer.Stop(); searchDebounce.Stop(); updateTimer.Stop(); realtime?.Dispose(); };
 
         ShowLogin();
         if (allowResume)
         {
+            var startup = ServerConfig.Load();
+            if (startup.StartMinimized) WindowState = WindowState.Minimized;
+            if (startup.LaunchAtStartup) StartupSettings.Apply(true);   // keeps the entry pointing at this exe
             var saved = ServerConfig.Load();
             if (saved.IsComplete && saved.RememberMe && SessionStore.Load() != null) loginPanel?.HideForm();
             _ = TryResumeAsync();
@@ -146,7 +154,8 @@ public partial class MainWindow : Window
         loginPanel?.SetBusy(null);
     }
 
-    bool updatePopupShown;
+    string? popupVersion;          // the update version whose pop-up was already shown
+    DateTime lastUpdateCheck = DateTime.MinValue;
 
     void StartSession(Api newApi, Profile newMe, bool remember = false)
     {
@@ -167,7 +176,7 @@ public partial class MainWindow : Window
         {
             SessionStore.Clear();
         }
-        updatePopupShown = false;
+        popupVersion = null;
 
         clients = new();
         target = null;
@@ -206,6 +215,10 @@ public partial class MainWindow : Window
         {
             realtime = new RealtimeClient(api.Config.Url, api.Config.AnonKey, api.GetAccessTokenAsync);
             realtime.Changed += OnRemoteChange;
+            realtime.Detail = ApplyRemoteDetail;
+            realtime.PresenceChanged += () => Dispatcher.BeginInvoke(RefreshPresenceUi);
+            realtime.PeopleChanged += () => Dispatcher.BeginInvoke(OnPeopleChanged);
+            realtime.TrackPresence(me.Id);
             realtime.ConnectionChanged += ok => Dispatcher.BeginInvoke(() => liveInstant = ok);
             if (!me.IsStaff) realtime.Watch(me.Id);
         }
@@ -230,13 +243,15 @@ public partial class MainWindow : Window
         searchDebounce.Stop();
         realtime?.Dispose();
         realtime = null;
+        Presence.Replace(new HashSet<string>());
 
         var root = (Grid)Content;
-        foreach (var overlay in new UIElement?[] { adminPanel, passwordPanel, updatePanel })
+        foreach (var overlay in new UIElement?[] { adminPanel, passwordPanel, updatePanel, settingsPanel })
             if (overlay != null) root.Children.Remove(overlay);
         adminPanel = null;
         passwordPanel = null;
         updatePanel = null;
+        settingsPanel = null;
 
         TrackerPanel.Children.Clear();
         ClientList.ItemsSource = null;
@@ -309,15 +324,17 @@ public partial class MainWindow : Window
         if (api is DemoApi && !Updater.Preview) return;
         var url = ServerConfig.Load().UpdateUrl;
         if (url.Length == 0 && !Updater.Preview) return;
+        lastUpdateCheck = DateTime.UtcNow;
         pendingUpdate = await Updater.CheckAsync(url);
         if (pendingUpdate != null)
         {
             UpdateButton.Visibility = Visibility.Visible;
             UpdateButton.ToolTip = pendingUpdate.Notes;
-            // pop the notes up once, right after signing in
-            if (!updatePopupShown)
+            // pop the notes up once for each new version, whenever it is found while the app is open
+            var ver = pendingUpdate.Version.ToString();
+            if (popupVersion != ver)
             {
-                updatePopupShown = true;
+                popupVersion = ver;
                 Update_Click(this, new RoutedEventArgs());
             }
         }
@@ -365,11 +382,79 @@ public partial class MainWindow : Window
             adminPanel = new AdminPanel(api, me) { Visibility = Visibility.Collapsed };
             Grid.SetColumnSpan(adminPanel, 2);
             System.Windows.Controls.Panel.SetZIndex(adminPanel, 10);
-            adminPanel.Changed += async () => await LoadClientsAsync();
+            adminPanel.Changed += async () =>
+            {
+                await LoadClientsAsync();
+                realtime?.BroadcastPeopleChanged();   // everyone else refreshes straight away
+            };
             adminPanel.CloseRequested += () => adminPanel.Visibility = Visibility.Collapsed;
             ((Grid)Content).Children.Add(adminPanel);
         }
         adminPanel.Visibility = Visibility.Visible;
+    }
+
+    int peopleTicket;
+
+    /// <summary>
+    /// An admin changed people somewhere: re-read this person's own profile (role, name) and, for staff, the
+    /// client list. A changed role switches this window between the client and Grinder views on the spot.
+    /// </summary>
+    async void OnPeopleChanged()
+    {
+        int ticket = Interlocked.Increment(ref peopleTicket);
+        await Task.Delay(300);                       // a burst of changes becomes one refresh
+        if (ticket != peopleTicket || api == null || me == null) return;
+        var current = api;
+        try
+        {
+            var fresh = await current.GetMyProfileAsync();
+            if (ticket != peopleTicket || api != current) return;
+            if (fresh == null) { SignOut_Click(this, new RoutedEventArgs()); return; }
+
+            if (fresh.Role != me.Role)
+            {
+                bool remember = ServerConfig.Load().RememberMe;
+                var keepApi = api;
+                EndSession();
+                StartSession(keepApi, fresh, remember);
+                return;
+            }
+
+            if (fresh.Label != me.Label) { me = fresh; UserText.Text = $"{me.Label}  \u00B7  {Catalog.RoleLabel(me.Role)}  \u00B7  v{Updater.CurrentText}"; }
+            if (me.IsStaff)
+            {
+                await LoadClientsAsync();
+                if (adminPanel != null) await adminPanel.ReloadAsync();
+            }
+        }
+        catch (ApiException ex) when (ex.Status is 401 or 403)
+        {
+            SignOut_Click(this, new RoutedEventArgs());   // the account was removed
+        }
+        catch { /* the next change or the safety refresh will catch up */ }
+    }
+
+    SettingsPanel? settingsPanel;
+
+    void Settings_Click(object sender, RoutedEventArgs e)
+    {
+        if (settingsPanel == null)
+        {
+            settingsPanel = new SettingsPanel(me) { Visibility = Visibility.Collapsed };
+            Grid.SetColumnSpan(settingsPanel, 2);
+            System.Windows.Controls.Panel.SetZIndex(settingsPanel, 15);
+            settingsPanel.CloseRequested += () => settingsPanel!.Visibility = Visibility.Collapsed;
+            settingsPanel.ChangePasswordRequested += () =>
+            {
+                settingsPanel!.Visibility = Visibility.Collapsed;
+                ChangePassword_Click(this, new RoutedEventArgs());
+            };
+            settingsPanel.SignOutRequested += () => SignOut_Click(this, new RoutedEventArgs());
+            ((Grid)Content).Children.Add(settingsPanel);
+        }
+        settingsPanel.Reload();
+        settingsPanel.Visibility = Visibility.Visible;
+        settingsPanel.Focus();
     }
 
     void SignOut_Click(object sender, RoutedEventArgs e)
@@ -457,6 +542,8 @@ public partial class MainWindow : Window
             .ToList();
         if (keep != null && ClientList.ItemsSource is List<Profile> l)
             ClientList.SelectedItem = l.FirstOrDefault(c => c.Id == keep);
+        var renewed = clients.FirstOrDefault(c => c.Id == keep);
+        if (renewed != null && target != null && me != null && target.Id != me.Id) { target = renewed; UpdateTitle(); }
     }
 
     void ClientSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplyClientFilter();
@@ -478,9 +565,67 @@ public partial class MainWindow : Window
     bool liveInstant;
     int remoteTicket;
 
+    /// <summary>Somebody opened or closed the app: refresh the green dots.</summary>
+    void RefreshPresenceUi()
+    {
+        ApplyClientFilter();
+        UpdateTitle();
+    }
+
     /// <summary>A change landed on the server: re-read soon (a short delay lets bursts of changes merge).</summary>
     readonly HashSet<string> pendingTables = new();
     bool pendingFull;
+
+    /// <summary>
+    /// Applies a change straight from the realtime event so it shows up without another round trip.
+    /// When it cannot be applied safely the normal re-read takes over.
+    /// </summary>
+    bool ApplyRemoteDetail(RemoteChange c)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            bool applied;
+            try { applied = ApplyOnUi(c); }
+            catch { applied = false; }
+            if (!applied) OnRemoteChange(c.Table);
+        });
+        return true;
+    }
+
+    bool ApplyOnUi(RemoteChange c)
+    {
+        var who = target;
+        if (who == null || api == null) return true;                  // nothing on screen to update
+        if (c.ClientId != null && c.ClientId != who.Id) return true;  // somebody else's row
+        if (c.ClientId == null || inflight > 0) return false;
+        bool gone = c.Type == "DELETE";
+        switch (c.Table)
+        {
+            case "ticks" when c.CamoId != null:
+                if (gone) data.Ticks.Remove(c.CamoId); else data.Ticks.Add(c.CamoId);
+                break;
+            case "levels" when c.WeaponKey != null:
+                if (gone) data.Levels.Remove(c.WeaponKey);
+                else if (c.Level != null) data.Levels[c.WeaponKey] = c.Level.Value;
+                else return false;
+                break;
+            case "classes" when c.WeaponKey != null:
+                if (gone) data.Classes.Remove(c.WeaponKey);
+                else if (c.Cls != null) data.Classes[c.WeaponKey] = c.Cls;
+                else return false;
+                break;
+            default:
+                return false;
+        }
+        var sig = data.Signature();
+        if (sig != lastSig)
+        {
+            lastSig = sig;
+            Render();
+        }
+        SetStatus("Live (instant) \u00B7 changed " + DateTime.Now.ToString("HH:mm:ss"), true);
+        return true;
+    }
 
     void OnRemoteChange(string? table)
     {
@@ -490,7 +635,7 @@ public partial class MainWindow : Window
             if (table == null && (DateTime.UtcNow - lastFullLoad).TotalSeconds < 4) return;
             if (table == null) pendingFull = true; else pendingTables.Add(table);
             int ticket = Interlocked.Increment(ref remoteTicket);
-            await Task.Delay(120);
+            await Task.Delay(40);
             if (ticket != remoteTicket) return; // a newer change will do the refresh
             for (int i = 0; i < 20 && inflight > 0; i++) await Task.Delay(100);
             string? only = !pendingFull && pendingTables.Count == 1 ? pendingTables.First() : null;

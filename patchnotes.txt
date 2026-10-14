@@ -1,1 +1,6 @@
-- Uses far less memory while the app sits in the background
+- Changes now appear on other screens almost instantly, including un-ticks
+- New Settings page (gear icon): launch when Windows starts, start minimized, change password and sign out
+- Green and red dots show which clients have the app open
+- Role and name changes update live on every open copy
+- The update pop-up appears as soon as a new version is out, even while the app is open
+- New slim dark scroll bars

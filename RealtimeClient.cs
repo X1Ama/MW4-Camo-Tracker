@@ -9,6 +9,16 @@ namespace MasteryTracker;
 /// changes it raises <see cref="Changed"/> and the app re-reads the rows, so progress appears within a moment
 /// instead of waiting for the next poll. Reconnects on its own.
 /// </summary>
+/// <summary>The people who currently have the app open.</summary>
+public static class Presence
+{
+    public static HashSet<string> Online { get; private set; } = new();
+    public static void Replace(HashSet<string> ids) => Online = ids;
+}
+
+/// <summary>What a realtime event said, so the screen can be updated without asking the server again.</summary>
+public sealed record RemoteChange(string Table, string Type, string? ClientId, string? CamoId, string? WeaponKey, int? Level, string? Cls);
+
 public sealed class RealtimeClient : IDisposable
 {
     static readonly string[] Tables = { "ticks", "levels", "classes", "custom_weapons" };
@@ -28,6 +38,92 @@ public sealed class RealtimeClient : IDisposable
     bool disposed;
 
     public event Action<string?>? Changed;
+
+    /// <summary>Raised with the details of a change. Returns true when the app dealt with it directly.</summary>
+    public Func<RemoteChange, bool>? Detail { get; set; }
+
+    /// <summary>Raised when somebody opens or closes the app.</summary>
+    public event Action? PresenceChanged;
+
+    /// <summary>Raised when an admin changed roles, names or assignments somewhere.</summary>
+    public event Action? PeopleChanged;
+
+    /// <summary>Tells every open copy of the app that people or roles changed, so they refresh at once.</summary>
+    public void BroadcastPeopleChanged()
+    {
+        var sock = socket;
+        if (sock?.State != WebSocketState.Open || presenceKey == null) return;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await SendAsync(sock, new
+                {
+                    topic = PresenceTopic,
+                    @event = "broadcast",
+                    payload = new { type = "broadcast", @event = "people", payload = new { from = presenceKey } },
+                    @ref = NextRef(),
+                });
+            }
+            catch { /* the 30 second safety refresh still covers it */ }
+        });
+    }
+
+    const string PresenceTopic = "realtime:online";
+    string? presenceKey;
+    bool tracked;
+
+    /// <summary>Announces this person as online and listens for everybody else.</summary>
+    public void TrackPresence(string userId)
+    {
+        presenceKey = userId;
+        if (loop == null || loop.IsCompleted) loop = Task.Run(RunAsync);
+    }
+
+    async Task JoinPresenceAsync(ClientWebSocket sock)
+    {
+        if (presenceKey == null) return;
+        var token = await tokenProvider() ?? anonKey;
+        var r = NextRef();
+        await SendAsync(sock, new
+        {
+            topic = PresenceTopic,
+            @event = "phx_join",
+            payload = new
+            {
+                config = new
+                {
+                    broadcast = new { ack = false, self = false },
+                    presence = new { key = presenceKey, enabled = true },
+                    postgres_changes = Array.Empty<object>(),
+                },
+                access_token = token,
+            },
+            @ref = r,
+            join_ref = r,
+        });
+    }
+
+    void ReadPresence(string? ev, JsonElement root)
+    {
+        if (!root.TryGetProperty("payload", out var p) || p.ValueKind != JsonValueKind.Object) return;
+        var set = new HashSet<string>(Presence.Online);
+        if (ev == "presence_state")
+        {
+            set.Clear();
+            foreach (var k in p.EnumerateObject()) set.Add(k.Name);
+        }
+        else if (ev == "presence_diff")
+        {
+            if (p.TryGetProperty("leaves", out var lv) && lv.ValueKind == JsonValueKind.Object)
+                foreach (var k in lv.EnumerateObject()) set.Remove(k.Name);
+            if (p.TryGetProperty("joins", out var jn) && jn.ValueKind == JsonValueKind.Object)
+                foreach (var k in jn.EnumerateObject()) set.Add(k.Name);
+        }
+        else return;
+        Presence.Replace(set);
+        PresenceChanged?.Invoke();
+    }
     public event Action<bool>? ConnectionChanged;
 
     public RealtimeClient(string baseUrl, string anonKey, Func<Task<string?>> tokenProvider)
@@ -62,6 +158,8 @@ public sealed class RealtimeClient : IDisposable
                 socket = sock;
                 joinedTopic = null;
                 await JoinAsync(sock);
+                tracked = false;
+                await JoinPresenceAsync(sock);
                 var beat = HeartbeatAsync(sock);
                 await ReadAsync(sock);
             }
@@ -70,6 +168,7 @@ public sealed class RealtimeClient : IDisposable
             socket = null;
             joinedTopic = null;
             ConnectionChanged?.Invoke(false);
+            if (Presence.Online.Count > 0) { Presence.Replace(new HashSet<string>()); PresenceChanged?.Invoke(); }
             if (disposed) break;
             try { await Task.Delay(2000, cts.Token); } catch { break; }
         }
@@ -167,15 +266,61 @@ public sealed class RealtimeClient : IDisposable
                 var root = d.RootElement;
                 var ev = root.TryGetProperty("event", out var e) ? e.GetString() : null;
                 var topic = root.TryGetProperty("topic", out var t) ? t.GetString() : null;
+                if (topic == PresenceTopic)
+                {
+                    if (ev == "phx_reply" && root.TryGetProperty("payload", out var pr)
+                        && pr.TryGetProperty("status", out var ps) && ps.GetString() == "ok" && presenceKey != null && !tracked)
+                    {
+                        // joined: announce this person (once per connection)
+                        tracked = true;
+                        await SendAsync(sock, new
+                        {
+                            topic = PresenceTopic,
+                            @event = "presence",
+                            payload = new { type = "presence", @event = "track", payload = new { user = presenceKey, online_at = DateTime.UtcNow.ToString("o") } },
+                            @ref = NextRef(),
+                        });
+                    }
+                    else if (ev == "broadcast")
+                    {
+                        if (root.TryGetProperty("payload", out var bp) && bp.TryGetProperty("event", out var be)
+                            && be.GetString() == "people")
+                            PeopleChanged?.Invoke();
+                    }
+                    else ReadPresence(ev, root);
+                    continue;
+                }
                 if (ev == "postgres_changes")
                 {
                     string? table = null;
+                    RemoteChange? detail = null;
                     try
                     {
-                        if (root.GetProperty("payload").GetProperty("data").TryGetProperty("table", out var tb))
-                            table = tb.GetString();
+                        var data = root.GetProperty("payload").GetProperty("data");
+                        if (data.TryGetProperty("table", out var tb)) table = tb.GetString();
+                        var type = data.TryGetProperty("type", out var ty) ? ty.GetString() ?? "" : "";
+                        string? Pick(string prop)
+                        {
+                            foreach (var holder in new[] { "record", "old_record" })
+                                if (data.TryGetProperty(holder, out var rec) && rec.ValueKind == JsonValueKind.Object
+                                    && rec.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String)
+                                    return v.GetString();
+                            return null;
+                        }
+                        int? level = null;
+                        if (data.TryGetProperty("record", out var rr) && rr.ValueKind == JsonValueKind.Object
+                            && rr.TryGetProperty("level", out var lv) && lv.ValueKind == JsonValueKind.Number)
+                            level = lv.GetInt32();
+                        if (table != null)
+                            detail = new RemoteChange(table, type, Pick("client_id"), Pick("camo_id"), Pick("weapon_key"), level, Pick("cls"));
                     }
                     catch { /* unknown shape: refresh everything */ }
+                    if (detail != null && Detail != null)
+                    {
+                        bool handled;
+                        try { handled = Detail(detail); } catch { handled = false; }
+                        if (handled) continue;
+                    }
                     Changed?.Invoke(table);
                 }
                 else if (ev == "phx_reply" && topic == joinedTopic && root.TryGetProperty("payload", out var p)

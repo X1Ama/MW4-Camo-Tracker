@@ -18,7 +18,24 @@
                 <TextBox x:Name="ClientSearch" DockPanel.Dock="Top" Margin="12,0,12,10"
                          TextChanged="ClientSearch_TextChanged"/>
                 <ListBox x:Name="ClientList" Background="Transparent" BorderThickness="0"
-                         DisplayMemberPath="Label" SelectionChanged="ClientList_SelectionChanged"/>
+                         SelectionChanged="ClientList_SelectionChanged">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel LastChildFill="True">
+                                <Ellipse x:Name="Dot" DockPanel.Dock="Right" Width="8" Height="8" Fill="#E5484D"
+                                         VerticalAlignment="Center" Margin="8,0,2,0"
+                                         ToolTip="Offline"/>
+                                <TextBlock Text="{Binding Label}"/>
+                            </DockPanel>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsOnline}" Value="True">
+                                    <Setter TargetName="Dot" Property="Fill" Value="#3DDC84"/>
+                                    <Setter TargetName="Dot" Property="ToolTip" Value="Has the app open"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
             </DockPanel>
         </Border>
 
@@ -36,15 +53,22 @@
                                VerticalAlignment="Center" Margin="0,0,12,0"/>
                     <Button x:Name="UpdateButton" Style="{StaticResource Chip}" Content="UPDATE AVAILABLE" FontSize="13" Padding="10,5" Margin="0,0,8,0" Visibility="Collapsed" Background="{StaticResource Accent}" Foreground="{StaticResource AccentFg}" BorderBrush="{StaticResource Accent}" Click="Update_Click"/>
                     <Button x:Name="AdminButton" Style="{StaticResource Chip}" Content="ADMIN PANEL" FontSize="13" Padding="10,5" Margin="0,0,8,0" Visibility="Collapsed" Click="Admin_Click"/>
-                    <Button Style="{StaticResource Chip}" Content="CHANGE PASSWORD" FontSize="13" Padding="10,5" Margin="0,0,8,0" Click="ChangePassword_Click"/>
-                    <Button Style="{StaticResource Chip}" Content="SIGN OUT" FontSize="13" Padding="10,5"
-                            Click="SignOut_Click"/>
+                    <Button Style="{StaticResource Chip}" Padding="7" ToolTip="Settings"
+                            AutomationProperties.Name="SETTINGS" Click="Settings_Click">
+                        <Viewbox Width="18" Height="18">
+                            <Path Width="24" Height="24"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  Data="F0 M19.14,12.94 C19.18,12.64 19.2,12.33 19.2,12 C19.2,11.68 19.18,11.36 19.13,11.06 L21.16,9.48 C21.34,9.34 21.39,9.07 21.28,8.87 L19.36,5.55 C19.24,5.33 18.99,5.26 18.77,5.33 L16.38,6.29 C15.88,5.91 15.35,5.59 14.76,5.35 L14.4,2.81 C14.36,2.57 14.16,2.4 13.92,2.4 H10.08 C9.84,2.4 9.65,2.57 9.61,2.81 L9.25,5.35 C8.66,5.59 8.12,5.92 7.63,6.29 L5.24,5.33 C5.02,5.25 4.77,5.33 4.65,5.55 L2.74,8.87 C2.62,9.08 2.66,9.34 2.86,9.48 L4.89,11.06 C4.84,11.36 4.8,11.69 4.8,12 C4.8,12.31 4.82,12.64 4.87,12.94 L2.84,14.52 C2.66,14.66 2.61,14.93 2.72,15.13 L4.64,18.45 C4.76,18.67 5.01,18.74 5.23,18.67 L7.62,17.71 C8.12,18.09 8.65,18.41 9.24,18.65 L9.6,21.19 C9.65,21.43 9.84,21.6 10.08,21.6 H13.92 C14.16,21.6 14.36,21.43 14.39,21.19 L14.75,18.65 C15.34,18.41 15.88,18.09 16.37,17.71 L18.76,18.67 C18.98,18.75 19.23,18.67 19.35,18.45 L21.27,15.13 C21.39,14.91 21.34,14.66 21.15,14.52 L19.14,12.94 Z M12,15.6 C10.02,15.6 8.4,13.98 8.4,12 C8.4,10.02 10.02,8.4 12,8.4 C13.98,8.4 15.6,10.02 15.6,12 C15.6,13.98 13.98,15.6 12,15.6 Z"/>
+                        </Viewbox>
+                    </Button>
                 </StackPanel>
                 <StackPanel>
                     <TextBlock x:Name="KickerText" Text="MW4" Foreground="{StaticResource Muted}"
                                FontFamily="{StaticResource Display}" FontSize="13"/>
-                    <TextBlock x:Name="TitleText" FontFamily="{StaticResource Display}" FontSize="30"
-                               Text="MW4 CAMO TRACKER"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="TitleText" FontFamily="{StaticResource Display}" FontSize="30"
+                                   Text="MW4 CAMO TRACKER"/>
+                    </StackPanel>
                     <TextBlock x:Name="StatusText" Foreground="{StaticResource Muted}" FontSize="12"
                                FontFamily="Consolas"/>
                 </StackPanel>

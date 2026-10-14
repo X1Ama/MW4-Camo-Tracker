@@ -5,6 +5,8 @@ public sealed record Profile(string Id, string Email, string DisplayName, string
 {
     public string Label => Catalog.Cap(string.IsNullOrWhiteSpace(DisplayName) ? Email.Replace(Catalog.UserDomain, "") : DisplayName);
     public bool IsStaff => Role is "admin" or "owner";
+    /// <summary>True while that person has the app open (kept up to date by the realtime presence channel).</summary>
+    public bool IsOnline => Presence.Online.Contains(Id);
     /// <summary>
     /// The user name as it should be written. User names are stored in lower case, so when the display name is the
     /// same word (ignoring case), its capitals are used; otherwise just the first letter is raised.

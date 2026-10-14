@@ -14,6 +14,8 @@ public sealed class ServerConfig
     public string LastEmail { get; set; } = "";
     public string UpdateUrl { get; set; } = "";
     public bool RememberMe { get; set; }
+    public bool StartMinimized { get; set; }
+    public bool LaunchAtStartup { get; set; }
 
     // The project address and public (anon) key are not secrets: they ship inside every copy so nobody has to enter them.
     const string DefaultUrl = "https://bhohinvgodxqqfwvwkwx.supabase.co";
@@ -42,6 +44,8 @@ public sealed class ServerConfig
                 if (c.LastEmail.Length > 0) result.LastEmail = c.LastEmail;
                 if (c.UpdateUrl.Length > 0) result.UpdateUrl = c.UpdateUrl;
                 result.RememberMe = c.RememberMe;
+                result.StartMinimized = c.StartMinimized;
+                result.LaunchAtStartup = c.LaunchAtStartup;
             }
             catch { /* ignore a damaged file */ }
         }
@@ -237,6 +241,10 @@ public class Api
             .Select(e => new Profile(Str(e, "id"), Str(e, "email"), Str(e, "display_name"), Str(e, "role")))
             .ToList();
     }
+
+    /// <summary>The signed-in person's profile as it is right now (null when it no longer exists).</summary>
+    public virtual async Task<Profile?> GetMyProfileAsync() =>
+        (await GetProfilesAsync($"?id=eq.{UserId}&select=id,email,display_name,role")).FirstOrDefault();
 
     /// <summary>Everyone the signed-in user may see: clients they manage (all of them for an owner).</summary>
     public virtual async Task<List<Profile>> GetManagedClientsAsync() =>

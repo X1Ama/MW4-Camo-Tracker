@@ -46,6 +46,9 @@ public partial class LoginPanel : UserControl
         SignInButton.IsEnabled = true;
         EmailBox.Text = cfg.LastEmail;
         RememberCheck.IsChecked = cfg.RememberMe;
+        var latest = ServerConfig.Load();          // settings may have changed while signed in
+        cfg.StartMinimized = latest.StartMinimized;
+        cfg.LaunchAtStartup = latest.LaunchAtStartup;
         api = null;
         if (cfg.IsComplete)
         {

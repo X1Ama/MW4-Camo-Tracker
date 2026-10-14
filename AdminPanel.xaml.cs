@@ -47,7 +47,7 @@ public partial class AdminPanel : UserControl
         MessageText.Foreground = (Brush)Application.Current.Resources[ok ? "Accent" : "Warn"];
     }
 
-    async Task ReloadAsync()
+    public async Task ReloadAsync()
     {
         try
         {

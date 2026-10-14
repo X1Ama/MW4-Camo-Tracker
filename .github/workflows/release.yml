@@ -38,12 +38,17 @@ jobs:
         shell: pwsh
         run: |
           $repo = "${{ github.repository }}"
+          # the patch notes shown on the update screen come from patchnotes.txt (one "- " line per change)
+          $notes = @()
+          if (Test-Path patchnotes.txt) {
+            $notes = @(Get-Content patchnotes.txt | Where-Object { $_ -match '^\s*[-*]\s+\S' } | ForEach-Object { ($_ -replace '^\s*[-*]\s+', '').Trim() })
+          }
           $manifest = [ordered]@{
             version  = $env:VERSION
             url      = "https://github.com/$repo/releases/latest/download/MasteryCamoTracker.exe"
-            notes    = "${{ github.event.head_commit.message }}".Split("`n")[0]
+            notes    = $notes
             required = $false
-          } | ConvertTo-Json
+          } | ConvertTo-Json -Depth 4
           Set-Content -Path out/update.json -Value $manifest -Encoding UTF8
 
       - name: Publish release

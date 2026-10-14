@@ -147,9 +147,9 @@ public partial class MainWindow : Window
 
     async Task CheckUpdateAsync()
     {
-        if (api is DemoApi) return;
+        if (api is DemoApi && !Updater.Preview) return;
         var url = ServerConfig.Load().UpdateUrl;
-        if (url.Length == 0) return;
+        if (url.Length == 0 && !Updater.Preview) return;
         pendingUpdate = await Updater.CheckAsync(url);
         if (pendingUpdate != null)
         {
@@ -158,21 +158,20 @@ public partial class MainWindow : Window
         }
     }
 
-    async void Update_Click(object sender, RoutedEventArgs e)
+    UpdatePanel? updatePanel;
+
+    void Update_Click(object sender, RoutedEventArgs e)
     {
         if (pendingUpdate == null) return;
-        UpdateButton.IsEnabled = false;
-        UpdateButton.Content = "DOWNLOADING…";
-        try
+        if (updatePanel == null)
         {
-            await Updater.DownloadAndRestartAsync(pendingUpdate);
+            updatePanel = new UpdatePanel { Visibility = Visibility.Collapsed };
+            Grid.SetColumnSpan(updatePanel, 2);
+            System.Windows.Controls.Panel.SetZIndex(updatePanel, 30);
+            updatePanel.CloseRequested += () => updatePanel.Visibility = Visibility.Collapsed;
+            ((Grid)Content).Children.Add(updatePanel);
         }
-        catch (Exception ex)
-        {
-            UpdateButton.IsEnabled = true;
-            UpdateButton.Content = "UPDATE AVAILABLE";
-            SetStatus("Update failed: " + ex.Message, false);
-        }
+        updatePanel.Show(pendingUpdate);
     }
     public void OpenAdminPanel() => Admin_Click(this, new RoutedEventArgs());
 

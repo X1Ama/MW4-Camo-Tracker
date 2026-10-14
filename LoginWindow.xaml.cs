@@ -34,8 +34,12 @@ public partial class LoginWindow : Window
         if (pending == null) return;
         UpdateBanner.Visibility = Visibility.Visible;
         UpdateText.Text = $"Version {pending.Version.Major}.{pending.Version.Minor}.{pending.Version.Build} is available"
-            + (pending.Notes.Length > 0 ? ": " + pending.Notes : ".")
-            + (pending.Required ? " You need to update before signing in." : "");
+            + (pending.Required ? ". You need to update before signing in." : "");
+        if (pending.Highlights.Count > 0)
+        {
+            UpdateNotes.Text = "What's new\n" + string.Join("\n", pending.Highlights.Select(h => "\u2022  " + h));
+            UpdateNotes.Visibility = Visibility.Visible;
+        }
         SignInButton.IsEnabled = !pending.Required;
     }
 

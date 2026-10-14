@@ -36,6 +36,8 @@ public partial class App : Application
             return;
         }
 
-        new MainWindow().Show();
+        var window = new MainWindow();
+        if (ServerConfig.Load().StartMinimized) window.StartInTray();   // hidden: only a tray icon until opened
+        else window.Show();
     }
 }

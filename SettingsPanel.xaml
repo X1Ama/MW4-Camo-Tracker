@@ -15,10 +15,15 @@
                           Checked="Startup_Changed" Unchecked="Startup_Changed" Margin="0,0,0,2"/>
                 <TextBlock Text="Opens the tracker by itself every time you sign in to Windows." Foreground="{StaticResource Muted}"
                            FontSize="12" Margin="30,0,0,16" TextWrapping="Wrap"/>
-                <CheckBox x:Name="MinimizedCheck" Style="{StaticResource RememberBox}" Content="Start minimized"
+                <CheckBox x:Name="MinimizedCheck" Style="{StaticResource RememberBox}" Content="Start hidden in the tray"
                           Checked="Minimized_Changed" Unchecked="Minimized_Changed" Margin="0,0,0,2"/>
-                <TextBlock Text="The app opens in the taskbar instead of in front of you." Foreground="{StaticResource Muted}"
-                           FontSize="12" Margin="30,0,0,24" TextWrapping="Wrap"/>
+                <TextBlock Text="The app starts out of sight with a small icon near the clock. Click the icon to open it." Foreground="{StaticResource Muted}"
+                           FontSize="12" Margin="30,0,0,16" TextWrapping="Wrap"/>
+
+                <CheckBox x:Name="TrayCheck" Style="{StaticResource RememberBox}" Content="Minimize to the tray"
+                          Checked="Tray_Changed" Unchecked="Tray_Changed" Margin="0,0,0,2"/>
+                <TextBlock Text="The minimize button hides the app near the clock instead of leaving it in the taskbar."
+                           Foreground="{StaticResource Muted}" FontSize="12" Margin="30,0,0,16" TextWrapping="Wrap"/>
 
                 <StackPanel x:Name="NotifyRow" Visibility="Collapsed">
                     <CheckBox x:Name="NotifyCheck" Style="{StaticResource RememberBox}" Content="Tell me when a client comes online"

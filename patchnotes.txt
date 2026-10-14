@@ -1,5 +1,3 @@
-- New card layout: every weapon is a card with a row of camo tiles, laid out in a grid
-- Hold and drag on the level bar to set a level
-- The level bar uses the same yellow as the rest of the app
-- You get a banner when one of your clients opens the tracker (can be switched off in Settings)
-- The app adds itself to the Start menu so Windows Search can find it
+- Updates are quicker: the new version downloads quietly in the background, so UPDATE NOW only has to restart
+- Start hidden in the tray and Minimize to the tray options in Settings
+- The selected mode tab and filter button are now yellow

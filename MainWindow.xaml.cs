@@ -63,19 +63,19 @@ public partial class MainWindow : Window
             if (inflight == 0) await RefreshAsync();
         };
         searchDebounce.Tick += (_, _) => { searchDebounce.Stop(); Render(); };
+        StateChanged += Window_StateChanged;
         updateTimer.Tick += async (_, _) => await CheckUpdateAsync();
         // coming back to the window is a good moment to look for a new version too
         Activated += async (_, _) =>
         {
             if (api != null && (DateTime.UtcNow - lastUpdateCheck).TotalSeconds > 60) await CheckUpdateAsync();
         };
-        Closed += (_, _) => { timer.Stop(); searchDebounce.Stop(); updateTimer.Stop(); realtime?.Dispose(); };
+        Closed += (_, _) => { timer.Stop(); searchDebounce.Stop(); updateTimer.Stop(); realtime?.Dispose(); tray?.Dispose(); };
 
         ShowLogin();
         if (allowResume)
         {
             var startup = ServerConfig.Load();
-            if (startup.StartMinimized) WindowState = WindowState.Minimized;
             if (startup.LaunchAtStartup) StartupSettings.Apply(true);   // keeps the entry pointing at this exe
             _ = Task.Run(StartMenuShortcut.Ensure);                      // so Windows Search can find the app
             var saved = ServerConfig.Load();
@@ -279,7 +279,8 @@ public partial class MainWindow : Window
                 FontSize = 17,
                 Padding = new Thickness(18, 9, 18, 9),
                 Margin = new Thickness(0, 0, 4, 0),
-                Background = m.Id == modeId ? Res("Panel2") : Brushes.Transparent,
+                Background = m.Id == modeId ? Res("Accent") : Brushes.Transparent,
+                Foreground = m.Id == modeId ? Res("AccentFg") : Res("Fg"),
                 BorderBrush = m.Id == modeId ? Res("Accent") : Res("Line"),
             };
             var id = m.Id;
@@ -299,8 +300,9 @@ public partial class MainWindow : Window
                 Content = text,
                 FontSize = 13,
                 Padding = new Thickness(12, 7, 12, 7),
-                Background = filter == id ? Res("Fg") : Res("Panel"),
+                Background = filter == id ? Res("Accent") : Res("Panel"),
                 Foreground = filter == id ? Res("AccentFg") : Res("Muted"),
+                BorderBrush = filter == id ? Res("Accent") : Res("Line"),
             };
             var f = id;
             b.Click += (_, _) => { filter = f; BuildFilters(); Render(); };
@@ -333,6 +335,7 @@ public partial class MainWindow : Window
         {
             UpdateButton.Visibility = Visibility.Visible;
             UpdateButton.ToolTip = pendingUpdate.Notes;
+            Updater.Prefetch(pendingUpdate);          // download quietly now so UPDATE NOW is instant
             // pop the notes up once for each new version, whenever it is found while the app is open
             var ver = pendingUpdate.Version.ToString();
             if (popupVersion != ver)
@@ -495,6 +498,44 @@ public partial class MainWindow : Window
             SignOut_Click(this, new RoutedEventArgs());   // the account was removed
         }
         catch { /* the next change or the safety refresh will catch up */ }
+    }
+
+    TrayIcon? tray;
+
+    /// <summary>Starts without showing the window: only a small icon near the clock until it is opened.</summary>
+    public void StartInTray()
+    {
+        ShowInTaskbar = false;
+        new System.Windows.Interop.WindowInteropHelper(this).EnsureHandle();
+        ShowTrayIcon();
+    }
+
+    void ShowTrayIcon()
+    {
+        if (tray != null) return;
+        tray = new TrayIcon("MW4 Camo Tracker");
+        tray.Open += () => Dispatcher.BeginInvoke(RestoreFromTray);
+        tray.Exit += () => Dispatcher.BeginInvoke(() => Application.Current.Shutdown());
+        tray.Show();
+    }
+
+    /// <summary>The minimize button hides the window in the tray when that setting is on.</summary>
+    void Window_StateChanged(object? sender, EventArgs e)
+    {
+        if (WindowState != WindowState.Minimized || !ServerConfig.Load().MinimizeToTray) return;
+        ShowTrayIcon();
+        ShowInTaskbar = false;
+        Hide();
+    }
+
+    void RestoreFromTray()
+    {
+        tray?.Dispose();
+        tray = null;
+        ShowInTaskbar = true;
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
     }
 
     SettingsPanel? settingsPanel;

@@ -13,6 +13,7 @@ public sealed class ServerConfig
     public string AnonKey { get; set; } = "";
     public string LastEmail { get; set; } = "";
     public string UpdateUrl { get; set; } = "";
+    public bool RememberMe { get; set; }
 
     static string AppDataPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MasteryTracker", "server.json");
@@ -35,6 +36,7 @@ public sealed class ServerConfig
                 if (c.AnonKey.Length > 0) result.AnonKey = c.AnonKey;
                 if (c.LastEmail.Length > 0) result.LastEmail = c.LastEmail;
                 if (c.UpdateUrl.Length > 0) result.UpdateUrl = c.UpdateUrl;
+                result.RememberMe = c.RememberMe;
             }
             catch { /* ignore a damaged file */ }
         }
@@ -108,6 +110,12 @@ public class Api
 
     public string UserId { get; private set; } = "";
 
+    /// <summary>The current refresh token, used by "Remember me".</summary>
+    public string? RefreshToken => refresh;
+
+    /// <summary>Raised whenever the server hands out a new refresh token, so a remembered session stays valid.</summary>
+    public Action<string>? RefreshTokenChanged { get; set; }
+
     public ServerConfig Config => cfg;
 
     /// <summary>Started during sign-in, in parallel with the profile lookup, and picked up by the main window.</summary>
@@ -180,6 +188,7 @@ public class Api
         var r = d.RootElement;
         access = r.GetProperty("access_token").GetString();
         refresh = r.GetProperty("refresh_token").GetString();
+        if (!string.IsNullOrEmpty(refresh)) RefreshTokenChanged?.Invoke(refresh);
         expiresUtc = DateTime.UtcNow.AddSeconds(r.GetProperty("expires_in").GetInt32());
         if (r.TryGetProperty("user", out var u)) UserId = u.GetProperty("id").GetString() ?? "";
     }
@@ -189,6 +198,20 @@ public class Api
         var body = await SendAsync(HttpMethod.Post, "/auth/v1/token?grant_type=password",
             JsonSerializer.Serialize(new { email, password }), needAuth: false);
         ReadSession(body);
+        return await FinishSignInAsync();
+    }
+
+    /// <summary>Signs in again from a remembered token, without a password.</summary>
+    public virtual async Task<Profile> ResumeAsync(string refreshToken)
+    {
+        var body = await SendAsync(HttpMethod.Post, "/auth/v1/token?grant_type=refresh_token",
+            JsonSerializer.Serialize(new { refresh_token = refreshToken }), needAuth: false);
+        ReadSession(body);
+        return await FinishSignInAsync();
+    }
+
+    async Task<Profile> FinishSignInAsync()
+    {
         Timing.Mark("login answered (password checked)");
         // Everything the main window needs next goes out at once, instead of one request after another.
         PrefetchedClients = GetManagedClientsAsync();

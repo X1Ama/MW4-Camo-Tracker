@@ -1,3 +1,4 @@
-- Your name now appears with the right capital letters in the admin panel
-- "By X1Ama" credit added to the sign-in screen and the tracker
-- Small tidy-ups to how names and user names are displayed
+- New "Remember me" tick box on the sign-in screen keeps you signed in on this PC
+- Update notes now pop up after you sign in, instead of sitting on the sign-in screen
+- The app has its own identity in Windows for the taskbar and Start menu
+- Smaller tidy-ups to the sign-in screen

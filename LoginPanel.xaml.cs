@@ -10,12 +10,13 @@ public partial class LoginPanel : UserControl
     Api? api;
 
     /// <summary>Raised with the signed-in connection and person; the main window takes over from here.</summary>
-    public event Action<Api, Profile>? SignedIn;
+    public event Action<Api, Profile, bool>? SignedIn;
 
     public LoginPanel()
     {
         InitializeComponent();
         EmailBox.Text = cfg.LastEmail;
+        RememberCheck.IsChecked = cfg.RememberMe;
         VersionText.Text = "By X1Ama  ·  v" + Updater.CurrentText;
         UrlBox.Text = cfg.Url;
         KeyBox.Text = cfg.AnonKey;
@@ -24,7 +25,6 @@ public partial class LoginPanel : UserControl
         // Once server.json supplies the server, clients never see these fields.
         ServerExpander.Visibility = cfg.IsComplete ? Visibility.Collapsed : Visibility.Visible;
         Loaded += (_, _) => (EmailBox.Text.Length == 0 ? (UIElement)EmailBox : PasswordBox).Focus();
-        Loaded += async (_, _) => await CheckForUpdateAsync();
         GotKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(UpdateHints, System.Windows.Threading.DispatcherPriority.Input);
         LostKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(UpdateHints, System.Windows.Threading.DispatcherPriority.Input);
     }
@@ -43,8 +43,9 @@ public partial class LoginPanel : UserControl
         }
         ErrorText.Visibility = Visibility.Collapsed;
         SignInButton.Content = "SIGN IN";
-        SignInButton.IsEnabled = !(pending?.Required ?? false);
+        SignInButton.IsEnabled = true;
         EmailBox.Text = cfg.LastEmail;
+        RememberCheck.IsChecked = cfg.RememberMe;
         api = null;
         if (cfg.IsComplete)
         {
@@ -56,41 +57,11 @@ public partial class LoginPanel : UserControl
             System.Windows.Threading.DispatcherPriority.Input);
     }
 
-    UpdateInfo? pending;
-
-    async Task CheckForUpdateAsync()
+    /// <summary>Shows a "signing you in" state while a remembered session is being restored.</summary>
+    public void SetBusy(string? message)
     {
-        if (cfg.UpdateUrl.Length == 0) return;
-        pending = await Updater.CheckAsync(cfg.UpdateUrl);
-        if (pending == null) return;
-        UpdateBanner.Visibility = Visibility.Visible;
-        UpdateText.Text = $"Version {pending.Version.Major}.{pending.Version.Minor}.{pending.Version.Build} is available"
-            + (pending.Required ? ". You need to update before signing in." : "");
-        if (pending.Highlights.Count > 0)
-        {
-            UpdateNotes.Text = "What's new\n" + string.Join("\n", pending.Highlights.Select(h => "\u2022  " + h));
-            UpdateNotes.Visibility = Visibility.Visible;
-        }
-        SignInButton.IsEnabled = !pending.Required;
-    }
-
-    async void Update_Click(object sender, RoutedEventArgs e)
-    {
-        if (pending == null) return;
-        UpdateButton.IsEnabled = false;
-        UpdateButton.Content = "DOWNLOADING\u2026";
-        UpdateProgress.Visibility = Visibility.Visible;
-        try
-        {
-            await Updater.DownloadAndRestartAsync(pending, new Progress<double>(v => UpdateProgress.Value = v));
-        }
-        catch (Exception ex)
-        {
-            UpdateText.Text = "Update failed: " + ex.Message;
-            UpdateButton.Content = "TRY AGAIN";
-            UpdateButton.IsEnabled = true;
-            UpdateProgress.Visibility = Visibility.Collapsed;
-        }
+        IsEnabled = message == null;
+        SignInButton.Content = message ?? "SIGN IN";
     }
 
     // The hints show only while a box is empty and not focused, so they never sit under the typing cursor.
@@ -176,10 +147,11 @@ public partial class LoginPanel : UserControl
             var me = await api.SignInAsync(user.ToLowerInvariant() + Catalog.UserDomain, Pw);
             Timing.Mark("server accepted the sign-in (login + profile)");
             cfg.LastEmail = user;
+            cfg.RememberMe = RememberCheck.IsChecked == true;
             cfg.Save();
             var session = api;
             api = null;                 // the main window owns this connection now
-            SignedIn?.Invoke(session, me);
+            SignedIn?.Invoke(session, me, cfg.RememberMe);
         }
         catch (ApiException ex) when (ex.Status is 400 or 401)
         {

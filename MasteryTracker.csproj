@@ -10,7 +10,7 @@
     <RootNamespace>MasteryTracker</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.1.3</Version>
+    <Version>0.1.4</Version>
     <!-- keep only the English WPF resources (drops about a dozen language packs) -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <!-- one fewer background GC thread and less memory held back -->
@@ -30,6 +30,10 @@
 
   <ItemGroup>
     <Resource Include="app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

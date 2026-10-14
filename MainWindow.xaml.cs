@@ -43,7 +43,9 @@ public partial class MainWindow : Window
     readonly DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromMinutes(30) };
     LoginPanel? loginPanel;
 
-    public MainWindow()
+    public MainWindow() : this(true) { }
+
+    MainWindow(bool allowResume)
     {
         TitleBar.Apply(this);
         InitializeComponent();
@@ -63,10 +65,11 @@ public partial class MainWindow : Window
         Closed += (_, _) => { timer.Stop(); searchDebounce.Stop(); updateTimer.Stop(); realtime?.Dispose(); };
 
         ShowLogin();
+        if (allowResume) _ = TryResumeAsync();
     }
 
     /// <summary>Opens straight into a session, used by the offline demo modes.</summary>
-    public MainWindow(Api api, Profile me) : this()
+    public MainWindow(Api api, Profile me) : this(false)
     {
         HideLogin();
         StartSession(api, me);
@@ -81,7 +84,7 @@ public partial class MainWindow : Window
             loginPanel = new LoginPanel();
             Grid.SetColumnSpan(loginPanel, 2);
             System.Windows.Controls.Panel.SetZIndex(loginPanel, 100);
-            loginPanel.SignedIn += (a, p) => StartSession(a, p);
+            loginPanel.SignedIn += (a, p, remember) => StartSession(a, p, remember);
             ((Grid)Content).Children.Add(loginPanel);
         }
         loginPanel.Visibility = Visibility.Visible;
@@ -95,12 +98,54 @@ public partial class MainWindow : Window
         loginPanel = null;
     }
 
-    void StartSession(Api newApi, Profile newMe)
+    /// <summary>When "Remember me" was ticked last time, signs straight back in without asking for the password.</summary>
+    async Task TryResumeAsync()
+    {
+        var token = SessionStore.Load();
+        if (token == null || loginPanel == null) return;
+        var cfg = ServerConfig.Load();
+        if (!cfg.IsComplete || !cfg.RememberMe) return;
+        loginPanel.SetBusy("SIGNING YOU IN\u2026");
+        try
+        {
+            var resumed = new Api(cfg);
+            Timing.Start("remembered session used");
+            var profile = await resumed.ResumeAsync(token);
+            StartSession(resumed, profile, true);
+        }
+        catch (ApiException ex) when (ex.Status is 400 or 401 or 403)
+        {
+            SessionStore.Clear();               // the saved sign-in is no longer valid: ask normally
+            loginPanel?.SetBusy(null);
+        }
+        catch
+        {
+            loginPanel?.SetBusy(null);          // offline: let them try by hand and keep the saved sign-in
+        }
+    }
+
+    bool updatePopupShown;
+
+    void StartSession(Api newApi, Profile newMe, bool remember = false)
     {
         Timing.Mark("main screen taking over");
         api = newApi;
         me = newMe;
-        if (loginPanel != null) loginPanel.Visibility = Visibility.Collapsed;
+        if (loginPanel != null)
+        {
+            loginPanel.SetBusy(null);
+            loginPanel.Visibility = Visibility.Collapsed;
+        }
+        if (remember)
+        {
+            SessionStore.Save(api.RefreshToken);
+            api.RefreshTokenChanged = SessionStore.Save;   // keep the saved sign-in current as it renews
+        }
+        else
+        {
+            SessionStore.Clear();
+        }
+        updatePopupShown = false;
 
         clients = new();
         target = null;
@@ -176,6 +221,7 @@ public partial class MainWindow : Window
         clients = new();
         data = new ClientData();
         target = null;
+        if (api != null) api.RefreshTokenChanged = null;
         api = null!;
         me = null!;
     }
@@ -246,6 +292,12 @@ public partial class MainWindow : Window
         {
             UpdateButton.Visibility = Visibility.Visible;
             UpdateButton.ToolTip = pendingUpdate.Notes;
+            // pop the notes up once, right after signing in
+            if (!updatePopupShown)
+            {
+                updatePopupShown = true;
+                Update_Click(this, new RoutedEventArgs());
+            }
         }
     }
 
@@ -300,6 +352,7 @@ public partial class MainWindow : Window
 
     void SignOut_Click(object sender, RoutedEventArgs e)
     {
+        SessionStore.Clear();
         EndSession();
         ShowLogin();
     }

@@ -6,21 +6,6 @@
             <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
                 <Border Width="420" HorizontalAlignment="Center" VerticalAlignment="Center">
 <StackPanel Margin="36,32">
-        <Border x:Name="UpdateBanner" Visibility="Collapsed" Background="{StaticResource Panel2}"
-                BorderBrush="{StaticResource Accent}" BorderThickness="1" Padding="12" Margin="0,0,0,18" CornerRadius="8">
-            <StackPanel>
-                <TextBlock x:Name="UpdateText" TextWrapping="Wrap" FontWeight="SemiBold"/>
-                <TextBlock x:Name="UpdateNotes" TextWrapping="Wrap" FontSize="13" Margin="0,8,0,0" LineHeight="20"
-                           Foreground="{StaticResource Muted}" Visibility="Collapsed"/>
-                <ProgressBar x:Name="UpdateProgress" Height="6" Margin="0,8,0,0" Visibility="Collapsed"
-                             Minimum="0" Maximum="1" Foreground="{StaticResource Accent}"
-                             Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}"/>
-                <Button x:Name="UpdateButton" Style="{StaticResource Chip}" Content="UPDATE NOW"
-                        HorizontalAlignment="Left" Margin="0,10,0,0" FontSize="14" Padding="14,7"
-                        Background="{StaticResource Accent}" Foreground="{StaticResource AccentFg}"
-                        BorderBrush="{StaticResource Accent}" Click="Update_Click"/>
-            </StackPanel>
-        </Border>
         <Viewbox x:Name="LogoMark" Width="56" Height="56" HorizontalAlignment="Left" Margin="0,0,0,14">
             <Canvas Width="256" Height="256">
                 <Rectangle Width="256" Height="256" RadiusX="56" RadiusY="56" Fill="#FFD21A"/>
@@ -43,7 +28,7 @@
             </Grid>
         </Border>
         <TextBlock Text="PASSWORD" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,0,0,4"/>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,0,22">
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,0,14">
 
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -88,7 +73,9 @@
                 </Border>
             </Grid>
         </Border>
-        <Button x:Name="SignInButton" Style="{StaticResource Chip}" Content="SIGN IN" FontSize="17"
+        <CheckBox x:Name="RememberCheck" Style="{StaticResource RememberBox}" Content="Remember me"
+                          Margin="2,0,0,20" Focusable="True"/>
+                <Button x:Name="SignInButton" Style="{StaticResource Chip}" Content="SIGN IN" FontSize="17"
                 Background="{StaticResource Accent}" Foreground="{StaticResource AccentFg}"
                 BorderBrush="{StaticResource Accent}" Padding="14,10" Click="SignIn_Click"/>
 

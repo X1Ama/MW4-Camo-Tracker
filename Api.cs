@@ -18,6 +18,7 @@ public sealed class ServerConfig
     public bool LaunchAtStartup { get; set; }
     public bool NotifyOnline { get; set; } = true;
     public bool MinimizeToTray { get; set; }
+    public bool NotifySound { get; set; } = true;
 
     // The project address and public (anon) key are not secrets: they ship inside every copy so nobody has to enter them.
     const string DefaultUrl = "https://bhohinvgodxqqfwvwkwx.supabase.co";
@@ -50,6 +51,7 @@ public sealed class ServerConfig
                 result.LaunchAtStartup = c.LaunchAtStartup;
                 result.NotifyOnline = c.NotifyOnline;
                 result.MinimizeToTray = c.MinimizeToTray;
+                result.NotifySound = c.NotifySound;
             }
             catch { /* ignore a damaged file */ }
         }

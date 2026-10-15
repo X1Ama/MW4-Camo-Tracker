@@ -28,6 +28,7 @@ public partial class SettingsPanel : UserControl
         StartupCheck.IsChecked = cfg.LaunchAtStartup;
         NotifyCheck.IsChecked = cfg.NotifyOnline;
         TrayCheck.IsChecked = cfg.MinimizeToTray;
+        SoundCheck.IsChecked = cfg.NotifySound;
         loading = false;
     }
 
@@ -44,6 +45,12 @@ public partial class SettingsPanel : UserControl
     {
         if (loading) return;
         Store(c => c.StartMinimized = MinimizedCheck.IsChecked == true);
+    }
+
+    void Sound_Changed(object sender, RoutedEventArgs e)
+    {
+        if (loading) return;
+        Store(c => c.NotifySound = SoundCheck.IsChecked == true);
     }
 
     void Tray_Changed(object sender, RoutedEventArgs e)

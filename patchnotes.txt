@@ -1,3 +1,5 @@
-- Grinders can no longer change other Grinders or owners (greyed out in the admin panel)
-- Role changes and client assignments reach other screens much faster
-- A newly promoted Grinder no longer sees themselves in the client list
+- Much lighter on memory: unused memory is handed back to Windows while you use the app
+- Ticking a camo or changing a level is instant: only that card is redrawn
+- Switching a role fades smoothly and keeps the live connection
+- A chime plays with the client-online banner (can be switched off in Settings)
+- DONE button on the Settings page is centred

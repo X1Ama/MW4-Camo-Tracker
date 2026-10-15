@@ -40,9 +40,10 @@ public partial class MainWindow : Window
 
     static FontFamily DisplayFont => (FontFamily)Application.Current.Resources["Display"];
 
-    readonly DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromMinutes(3) };
+    readonly DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromSeconds(60) };
     LoginPanel? loginPanel;
     bool trimmed;
+    DateTime lastTrim = DateTime.UtcNow;
 
     public MainWindow() : this(true) { }
 
@@ -58,8 +59,14 @@ public partial class MainWindow : Window
             if (api == null) return;
             // Fast safety-net polling until the server confirms live updates are working.
             bool idle = !IsActive || WindowState == WindowState.Minimized;
-            if (idle) { if (!trimmed) { trimmed = true; MemoryTrim.Run(); } } else trimmed = false;
-            timer.Interval = TimeSpan.FromSeconds(liveInstant ? (idle ? 60 : 8) : (idle ? 10 : 2));
+            if (idle) { if (!trimmed) { trimmed = true; lastTrim = DateTime.UtcNow; MemoryTrim.Run(); } }
+            else
+            {
+                trimmed = false;
+                // while in use, hand unused memory back every so often as well
+                if ((DateTime.UtcNow - lastTrim).TotalSeconds > 45) { lastTrim = DateTime.UtcNow; MemoryTrim.Run(); }
+            }
+            timer.Interval = TimeSpan.FromSeconds(liveInstant ? (idle ? 60 : 20) : (idle ? 10 : 2));
             if (inflight == 0) await RefreshAsync();
         };
         searchDebounce.Tick += (_, _) => { searchDebounce.Stop(); Render(); };
@@ -402,9 +409,11 @@ public partial class MainWindow : Window
     void OnClientOnline(string id)
     {
         if (me == null || !me.IsStaff) return;
-        if (!ServerConfig.Load().NotifyOnline) return;
+        var settings = ServerConfig.Load();
+        if (!settings.NotifyOnline) return;
         var who = clients.FirstOrDefault(c => c.Id == id);
         if (who == null) return;                      // not one of this person's clients
+        if (settings.NotifySound) NotifySound.Play();
 
         if (toastHost == null)
         {
@@ -456,6 +465,70 @@ public partial class MainWindow : Window
         life.Start();
     }
 
+    /// <summary>Moves this window between the client and Grinder views without reconnecting.</summary>
+    bool fadeInPending;
+
+    static Task FadeAsync(UIElement el, double to, int ms)
+    {
+        var done = new TaskCompletionSource();
+        var a = new System.Windows.Media.Animation.DoubleAnimation(to, TimeSpan.FromMilliseconds(ms))
+        {
+            EasingFunction = new System.Windows.Media.Animation.QuadraticEase(),
+        };
+        a.Completed += (_, _) => done.TrySetResult();
+        el.BeginAnimation(OpacityProperty, a);
+        return done.Task;
+    }
+
+    /// <summary>Brings the window content back after a role switch, as soon as the new data is drawn.</summary>
+    void FadeIn()
+    {
+        if (!fadeInPending) return;
+        fadeInPending = false;
+        _ = FadeAsync((Grid)Content, 1, 220);
+    }
+
+    async void SwitchRole(Profile fresh)
+    {
+        var root = (Grid)Content;
+        fadeInPending = true;
+        await FadeAsync(root, 0, 110);     // a short fade instead of a hard cut
+        if (me == null) return;
+        me = fresh;
+        foreach (var overlay in new UIElement?[] { adminPanel, settingsPanel })
+            if (overlay != null) root.Children.Remove(overlay);
+        adminPanel = null;
+        settingsPanel = null;
+
+        clients = new();
+        target = null;
+        data = new ClientData();
+        lastSig = "";
+        inflight = 0;
+
+        AdminButton.Visibility = me.IsStaff ? Visibility.Visible : Visibility.Collapsed;
+        UserText.Text = $"{me.Label}  \u00B7  {Catalog.RoleLabel(me.Role)}  \u00B7  v{Updater.CurrentText}";
+        if (me.IsStaff)
+        {
+            SidePanel.Visibility = Visibility.Visible;
+            SideCol.Width = new GridLength(280);
+            ClientList.ItemsSource = null;
+        }
+        else
+        {
+            SidePanel.Visibility = Visibility.Collapsed;
+            SideCol.Width = new GridLength(0);
+            target = me;
+            realtime?.Watch(me.Id);
+        }
+        TrackerPanel.Children.Clear();
+        UpdateTitle();
+        SetStatus("Loading\u2026", true);
+        _ = BeginSessionAsync();
+        // safety net: never leave the window faded out if the data is slow
+        _ = Task.Delay(1500).ContinueWith(_ => Dispatcher.BeginInvoke(FadeIn));
+    }
+
     int peopleTicket;
 
     /// <summary>
@@ -470,21 +543,20 @@ public partial class MainWindow : Window
         var current = api;
         try
         {
-            // a Grinder needs the client list either way, so ask for it at the same time as the profile
-            if (me.IsStaff) current.PrefetchedClients = current.GetManagedClientsAsync();
+            // the client list is asked for at the same time as the profile: a Grinder needs it either way, and
+            // somebody who has just been promoted needs it straight away
+            var clientsTask = current.GetManagedClientsAsync();
+            if (me.IsStaff) current.PrefetchedClients = clientsTask;
             var fresh = await current.GetMyProfileAsync();
             if (ticket != peopleTicket || api != current) return;
             if (fresh == null) { SignOut_Click(this, new RoutedEventArgs()); return; }
 
             if (fresh.Role != me.Role)
             {
-                // whatever was fetched earlier belongs to the old role (a client's copy holds only themselves)
-                current.PrefetchedClients = null;
+                // keep the connection and the live link; only the screen changes between client and Grinder
                 current.PrefetchedOwnData = null;
-                bool remember = ServerConfig.Load().RememberMe;
-                var keepApi = api;
-                EndSession();
-                StartSession(keepApi, fresh, remember);
+                current.PrefetchedClients = fresh.IsStaff ? clientsTask : null;
+                SwitchRole(fresh);
                 return;
             }
 
@@ -624,6 +696,7 @@ public partial class MainWindow : Window
                 Timing.Mark("first screen drawn");
                 Timing.Finish();
                 SetStatus("Live \u00B7 checked " + DateTime.Now.ToString("HH:mm:ss"), true);
+                FadeIn();
                 return;
             }
             catch { /* ask again below */ }
@@ -676,7 +749,10 @@ public partial class MainWindow : Window
         data = new ClientData();
         lastSig = "";
         UpdateTitle();
-        Render();
+        TrackerPanel.Children.Clear();       // the real screen is drawn once, when the data has arrived
+        cardByKey.Clear();
+        groupCount.Clear();
+        TrackerPanel.Children.Add(new TextBlock { Text = "Loading\u2026", Foreground = Res("Muted"), Margin = new Thickness(0, 20, 0, 0) });
         await RefreshAsync();
     }
 
@@ -787,6 +863,7 @@ public partial class MainWindow : Window
                 Timing.Finish();
             }
             SetStatus((liveInstant ? "Live (instant) \u00B7 " : "Live \u00B7 ") + "checked " + DateTime.Now.ToString("HH:mm:ss"), true);
+            FadeIn();
         }
         catch (Exception ex)
         {
@@ -794,11 +871,17 @@ public partial class MainWindow : Window
         }
     }
 
-    async void Mutate(Action apply, Action undo, Func<Task> send)
+    void Redraw(string? weaponKey)
+    {
+        if (weaponKey != null) RefreshCard(weaponKey);
+        else Render();
+    }
+
+    async void Mutate(Action apply, Action undo, Func<Task> send, string? weaponKey = null)
     {
         if (!CanEdit) return;
         apply();
-        Render();
+        Redraw(weaponKey);
         inflight++;
         try
         {
@@ -808,7 +891,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             undo();
-            Render();
+            Redraw(weaponKey);
             SetStatus("Could not save: " + ex.Message, false);
         }
         finally
@@ -852,8 +935,72 @@ public partial class MainWindow : Window
 
     void Render()
     {
+        RenderCore();
+    }
+
+    readonly Dictionary<string, Border> cardByKey = new();
+    readonly Dictionary<string, TextBlock> groupCount = new();
+
+    List<(string Id, string Label, bool Track)> ChipsFor(Row w, Mode mode)
+    {
+        var chips = new List<(string Id, string Label, bool Track)>();
+        if (mode.Track) chips.Add(("track-" + w.Key, "Camo Track", true));
+        foreach (var c in mode.Camos) chips.Add(($"{mode.Id}-{w.Key}-{Catalog.Slug(c)}", c, false));
+        return chips;
+    }
+
+    /// <summary>Redraws one weapon's card in place (a tick or a level change) instead of the whole list.</summary>
+    void RefreshCard(string key)
+    {
+        if (target == null || me == null || !cardByKey.TryGetValue(key, out var old) || old.Parent is not Panel parent)
+        {
+            Render();
+            return;
+        }
+        var mode = Catalog.Modes.First(m => m.Id == modeId);
+        var w = Rows().FirstOrDefault(r => r.Key == key);
+        if (w == null) { Render(); return; }
+        var chips = ChipsFor(w, mode);
+        int d = chips.Count(c => data.Ticks.Contains(c.Id));
+        bool all = d == chips.Count;
+        if ((filter == "todo" && all) || (filter == "done" && !all)) { Render(); return; }   // it leaves this list
+
+        var card = (Border)BuildRow(w, chips, d, all);
+        int i = parent.Children.IndexOf(old);
+        parent.Children.RemoveAt(i);
+        parent.Children.Insert(i, card);
+        cardByKey[key] = card;
+        UpdateCounts(mode);
+    }
+
+    /// <summary>The group counters and the overall progress bar, without rebuilding anything.</summary>
+    void UpdateCounts(Mode mode)
+    {
+        int total = 0, done = 0;
+        var perGroup = new Dictionary<string, (int D, int T)>();
+        foreach (var w in Rows())
+        {
+            var chips = ChipsFor(w, mode);
+            int d = chips.Count(c => data.Ticks.Contains(c.Id));
+            total += chips.Count;
+            done += d;
+            var cls = Catalog.Classes.Any(c => c.Code == w.Cls) ? w.Cls : "";
+            var (gd, gt) = perGroup.GetValueOrDefault(cls);
+            perGroup[cls] = (gd + d, gt + chips.Count);
+        }
+        foreach (var (code, text) in groupCount)
+            if (perGroup.TryGetValue(code, out var g)) text.Text = $"{g.D}/{g.T}";
+        int pct = total == 0 ? 0 : (int)Math.Round(done * 100.0 / total);
+        Progress.Value = pct;
+        ProgressText.Text = $"{done} / {total}  \u00B7  {pct}%";
+    }
+
+    void RenderCore()
+    {
         if (me == null || api == null) return;
         TrackerPanel.Children.Clear();
+        cardByKey.Clear();
+        groupCount.Clear();
         if (target == null)
         {
             TrackerPanel.Children.Add(new TextBlock
@@ -872,9 +1019,7 @@ public partial class MainWindow : Window
 
         foreach (var w in Rows())
         {
-            var chips = new List<(string Id, string Label, bool Track)>();
-            if (mode.Track) chips.Add(("track-" + w.Key, "Camo Track", true));
-            foreach (var c in mode.Camos) chips.Add(($"{mode.Id}-{w.Key}-{Catalog.Slug(c)}", c, false));
+            var chips = ChipsFor(w, mode);
 
             int d = chips.Count(c => data.Ticks.Contains(c.Id));
             total += chips.Count;
@@ -888,7 +1033,9 @@ public partial class MainWindow : Window
             if (filter == "todo" && all) continue;
             if (filter == "done" && !all) continue;
 
-            groups[cls].Add(BuildRow(w, chips, d, all));
+            var built = (Border)BuildRow(w, chips, d, all);
+            cardByKey[w.Key] = built;
+            groups[cls].Add(built);
         }
 
         foreach (var (code, rows) in groups)
@@ -896,14 +1043,16 @@ public partial class MainWindow : Window
             if (rows.Count == 0) continue;
             var (gd, gt) = groupDone[code];
             var head = new DockPanel { Margin = new Thickness(0, 22, 0, 0) };
-            head.Children.Add(new TextBlock
+            var countText = new TextBlock
             {
                 Text = $"{gd}/{gt}",
                 FontFamily = Mono,
                 Foreground = Res("Muted"),
                 FontSize = 12,
-            });
-            DockPanel.SetDock(head.Children[0], Dock.Right);
+            };
+            groupCount[code] = countText;
+            head.Children.Add(countText);
+            DockPanel.SetDock(countText, Dock.Right);
             head.Children.Add(new TextBlock
             {
                 Text = Catalog.ClassName(code).ToUpperInvariant(),
@@ -990,22 +1139,38 @@ public partial class MainWindow : Window
 
         if (CanEdit && !w.Fixed)
         {
-            var combo = new ComboBox { Margin = new Thickness(0, 6, 0, 0), FontSize = 12 };
-            combo.Items.Add(new ComboBoxItem { Content = "Set type\u2026", Tag = "" });
-            foreach (var c in Catalog.Classes) combo.Items.Add(new ComboBoxItem { Content = c.Name, Tag = c.Code });
-            combo.SelectedIndex = Math.Max(0, Array.FindIndex(Catalog.Classes, c => c.Code == w.Cls) + 1);
-            combo.SelectionChanged += (_, _) =>
+            // a plain button until it is used: building a drop-down for every weapon made the list slow to draw
+            var host = new ContentControl { Margin = new Thickness(0, 6, 0, 0) };
+            var pick = new Button
             {
-                if (combo.SelectedItem is not ComboBoxItem it) return;
-                var code = (string)it.Tag;
-                if (code == w.Cls) return;
-                var old = data.Classes.GetValueOrDefault(w.Key, "");
-                Mutate(
-                    () => { if (code.Length > 0) data.Classes[w.Key] = code; else data.Classes.Remove(w.Key); },
-                    () => { if (old.Length > 0) data.Classes[w.Key] = old; else data.Classes.Remove(w.Key); },
-                    () => api.SetClassAsync(target!.Id, w.Key, code));
+                Style = (Style)FindResource("Chip"),
+                Content = w.Cls.Length > 0 ? Catalog.ClassName(w.Cls) : "Set type\u2026",
+                FontSize = 12,
+                Padding = new Thickness(10, 5, 10, 5),
+                HorizontalContentAlignment = HorizontalAlignment.Left,
             };
-            body.Children.Add(combo);
+            pick.Click += (_, _) =>
+            {
+                var combo = new ComboBox { FontSize = 12 };
+                combo.Items.Add(new ComboBoxItem { Content = "Set type\u2026", Tag = "" });
+                foreach (var c in Catalog.Classes) combo.Items.Add(new ComboBoxItem { Content = c.Name, Tag = c.Code });
+                combo.SelectedIndex = Math.Max(0, Array.FindIndex(Catalog.Classes, c => c.Code == w.Cls) + 1);
+                combo.SelectionChanged += (_, _) =>
+                {
+                    if (combo.SelectedItem is not ComboBoxItem it) return;
+                    var code = (string)it.Tag;
+                    if (code == w.Cls) return;
+                    var old = data.Classes.GetValueOrDefault(w.Key, "");
+                    Mutate(
+                        () => { if (code.Length > 0) data.Classes[w.Key] = code; else data.Classes.Remove(w.Key); },
+                        () => { if (old.Length > 0) data.Classes[w.Key] = old; else data.Classes.Remove(w.Key); },
+                        () => api.SetClassAsync(target!.Id, w.Key, code));
+                };
+                host.Content = combo;
+                combo.IsDropDownOpen = true;
+            };
+            host.Content = pick;
+            body.Children.Add(host);
         }
 
         body.Children.Add(BuildLevel(w));
@@ -1042,7 +1207,8 @@ public partial class MainWindow : Window
                 Mutate(
                     () => { if (now) data.Ticks.Add(cid); else data.Ticks.Remove(cid); },
                     () => { if (now) data.Ticks.Remove(cid); else data.Ticks.Add(cid); },
-                    () => api.SetTickAsync(target!.Id, cid, now));
+                    () => api.SetTickAsync(target!.Id, cid, now),
+                    w.Key);
             };
             strip.Children.Add(b);
         }
@@ -1093,7 +1259,8 @@ public partial class MainWindow : Window
                 Mutate(
                     () => data.Levels[w.Key] = v,
                     () => data.Levels[w.Key] = old,
-                    () => api.SetLevelAsync(target!.Id, w.Key, v));
+                    () => api.SetLevelAsync(target!.Id, w.Key, v),
+                    w.Key);
             }
             // a box to type the level directly (digits only, 0 to the maximum)
             g.Children.RemoveAt(0);

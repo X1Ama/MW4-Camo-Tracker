@@ -16,6 +16,9 @@ public partial class AdminPanel : UserControl
     /// <summary>Raised after anything changed so the main window can refresh its client list.</summary>
     public event Action? Changed;
 
+    /// <summary>Raised the moment the server accepted a change, before the lists are re-read, so others can refresh at once.</summary>
+    public event Action? Saved;
+
     /// <summary>Raised when the Back button is pressed so the main window can show the tracker again.</summary>
     public event Action? CloseRequested;
 
@@ -116,7 +119,10 @@ public partial class AdminPanel : UserControl
 
         bool self = selected.Id == me.Id;
         bool canTouch = !self && (IsOwner || selected.Role == "client");
-        DetailPanel.IsEnabled = true;
+        // Grinders can only change their own clients; another Grinder or an owner is read-only for them.
+        bool canEdit = IsOwner || (!self && selected.Role == "client");
+        DetailPanel.IsEnabled = canEdit;
+        if (!canEdit) Say("Only an owner can change another Grinder or an owner.", false);
         DeleteButton.IsEnabled = canTouch;
         RoleRow.IsEnabled = IsOwner && !self;
 
@@ -149,6 +155,7 @@ public partial class AdminPanel : UserControl
                     try
                     {
                         await api.AssignAsync(adminId, cid, on);
+                        Saved?.Invoke();
                         links.RemoveAll(l => l.AdminId == adminId && l.ClientId == cid);
                         if (on) links.Add((adminId, cid));
                         Say(on ? "Client assigned." : "Client unassigned.");
@@ -171,6 +178,7 @@ public partial class AdminPanel : UserControl
         try
         {
             await work();
+            Saved?.Invoke();
             Say(okMessage);
             await ReloadAsync();
             Changed?.Invoke();

@@ -1,3 +1,3 @@
-- The app only opens once: starting it again brings the running window back, even from the tray or taskbar
-- Fixed the checkbox outline staying yellow after unticking
-- Settings tick boxes no longer keep a highlight after you click them
+- Grinders can no longer change other Grinders or owners (greyed out in the admin panel)
+- Role changes and client assignments reach other screens much faster
+- A newly promoted Grinder no longer sees themselves in the client list

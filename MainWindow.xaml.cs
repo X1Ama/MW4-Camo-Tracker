@@ -388,11 +388,8 @@ public partial class MainWindow : Window
             adminPanel = new AdminPanel(api, me) { Visibility = Visibility.Collapsed };
             Grid.SetColumnSpan(adminPanel, 2);
             System.Windows.Controls.Panel.SetZIndex(adminPanel, 10);
-            adminPanel.Changed += async () =>
-            {
-                await LoadClientsAsync();
-                realtime?.BroadcastPeopleChanged();   // everyone else refreshes straight away
-            };
+            adminPanel.Saved += () => realtime?.BroadcastPeopleChanged();   // everyone else refreshes straight away
+            adminPanel.Changed += async () => await LoadClientsAsync();
             adminPanel.CloseRequested += () => adminPanel.Visibility = Visibility.Collapsed;
             ((Grid)Content).Children.Add(adminPanel);
         }
@@ -468,17 +465,22 @@ public partial class MainWindow : Window
     async void OnPeopleChanged()
     {
         int ticket = Interlocked.Increment(ref peopleTicket);
-        await Task.Delay(300);                       // a burst of changes becomes one refresh
+        await Task.Delay(40);                        // a burst of changes becomes one refresh
         if (ticket != peopleTicket || api == null || me == null) return;
         var current = api;
         try
         {
+            // a Grinder needs the client list either way, so ask for it at the same time as the profile
+            if (me.IsStaff) current.PrefetchedClients = current.GetManagedClientsAsync();
             var fresh = await current.GetMyProfileAsync();
             if (ticket != peopleTicket || api != current) return;
             if (fresh == null) { SignOut_Click(this, new RoutedEventArgs()); return; }
 
             if (fresh.Role != me.Role)
             {
+                // whatever was fetched earlier belongs to the old role (a client's copy holds only themselves)
+                current.PrefetchedClients = null;
+                current.PrefetchedOwnData = null;
                 bool remember = ServerConfig.Load().RememberMe;
                 var keepApi = api;
                 EndSession();
@@ -635,7 +637,8 @@ public partial class MainWindow : Window
     {
         try
         {
-            clients = await TakeClientsAsync();
+            // only clients belong in this list: never the signed-in person, never another Grinder or owner
+            clients = (await TakeClientsAsync()).Where(c => c.Role == "client" && c.Id != me.Id).ToList();
             Timing.Mark("client list received");
             ApplyClientFilter();
             if (clients.Count == 0)

@@ -74,6 +74,10 @@ create or replace function public.admin_set_display_name(p_user uuid, p_name tex
 language plpgsql security definer set search_path = public as $$
 begin
   if public.my_role() not in ('owner','admin') or not public.can_manage(p_user) then raise exception 'Not allowed.'; end if;
+  -- an admin (Grinder) may only rename clients, never another admin or an owner
+  if public.my_role() = 'admin' and (select role from public.profiles where id = p_user) <> 'client' then
+    raise exception 'Not allowed.';
+  end if;
   update public.profiles set display_name = coalesce(p_name, '') where id = p_user;
 end $$;
 

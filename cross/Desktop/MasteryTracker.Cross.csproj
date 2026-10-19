@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Linux and macOS program (it also runs on Windows, which is handy for testing).
+    The Windows app in the repository root stays a WPF program; this one is a thin desktop shell around ../Core.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>MasteryCamoTracker</AssemblyName>
+    <RootNamespace>MasteryTracker</RootNamespace>
+    <Version>0.1.18</Version>
+    <ApplicationIcon>..\Core\Assets\app.ico</ApplicationIcon>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>false</TieredPGO>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+  </PropertyGroup>
+
+  <!-- dotnet publish -c Release -r linux-x64 (or osx-arm64, osx-x64, win-x64) gives one self-contained file -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <!-- macOS keeps the native libraries beside the program (they are signed there), the others bundle them -->
+  <PropertyGroup Condition="$(RuntimeIdentifier.StartsWith('osx'))">
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <ProjectReference Include="..\Core\MasteryTracker.Core.csproj" />
+  </ItemGroup>
+
+</Project>

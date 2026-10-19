@@ -1,0 +1,73 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MasteryTracker.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://MasteryTracker.Core/Styles.axaml"/>
+    </Application.Styles>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <SolidColorBrush x:Key="Bg" Color="#0D0F10"/>
+            <SolidColorBrush x:Key="Panel" Color="#16191B"/>
+            <SolidColorBrush x:Key="Panel2" Color="#1D2124"/>
+            <SolidColorBrush x:Key="Line" Color="#2D3337"/>
+            <SolidColorBrush x:Key="Fg" Color="#EEF0F1"/>
+            <SolidColorBrush x:Key="Muted" Color="#8B949A"/>
+            <SolidColorBrush x:Key="Accent" Color="#FFD21A"/>
+            <SolidColorBrush x:Key="AccentFg" Color="#0D0F10"/>
+            <SolidColorBrush x:Key="Warn" Color="#F0B84A"/>
+            <SolidColorBrush x:Key="Good" Color="#3DDC84"/>
+            <SolidColorBrush x:Key="Bad" Color="#E5484D"/>
+            <SolidColorBrush x:Key="DoneTint" Color="#24200A"/>
+            <SolidColorBrush x:Key="DoneLine" Color="#A88A1A"/>
+            <FontFamily x:Key="Display">avares://MasteryTracker.Core/Assets#Bebas Neue</FontFamily>
+            <FontFamily x:Key="Body">fonts:Inter#Inter</FontFamily>
+            <FontFamily x:Key="Mono">avares://MasteryTracker.Core/Assets#JetBrains Mono</FontFamily>
+
+            <!-- the Fluent theme reads these names for its controls, so the dark palette is set once here -->
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="TextControlBackground" Color="#16191B"/>
+                    <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#16191B"/>
+                    <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#16191B"/>
+                    <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#16191B"/>
+                    <SolidColorBrush x:Key="TextControlForeground" Color="#EEF0F1"/>
+                    <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#EEF0F1"/>
+                    <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#EEF0F1"/>
+                    <SolidColorBrush x:Key="TextControlBorderBrush" Color="#2D3337"/>
+                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#2D3337"/>
+                    <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#8B949A"/>
+                    <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#8B949A"/>
+                    <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#8B949A"/>
+                    <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#8B949A"/>
+                    <Thickness x:Key="TextControlBorderThemeThicknessFocused">1</Thickness>
+
+                    <SolidColorBrush x:Key="ComboBoxBackground" Color="#1D2124"/>
+                    <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#1D2124"/>
+                    <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#1D2124"/>
+                    <SolidColorBrush x:Key="ComboBoxBackgroundFocused" Color="#1D2124"/>
+                    <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#2D3337"/>
+                    <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#8B949A"/>
+                    <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#8B949A"/>
+                    <SolidColorBrush x:Key="ComboBoxBorderBrushFocused" Color="#8B949A"/>
+                    <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#1D2124"/>
+                    <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#8B949A"/>
+                    <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="#2D3337"/>
+                    <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="#FFD21A"/>
+                    <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver" Color="#FFD21A"/>
+                    <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="#0D0F10"/>
+                    <SolidColorBrush x:Key="ComboBoxItemForegroundSelectedPointerOver" Color="#0D0F10"/>
+
+                    <SolidColorBrush x:Key="ScrollBarThumbFill" Color="#3A4148"/>
+                    <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#5A646C"/>
+                    <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#FFD21A"/>
+                    <SolidColorBrush x:Key="ScrollBarTrackFill" Color="Transparent"/>
+                    <SolidColorBrush x:Key="ScrollBarTrackFillPointerOver" Color="Transparent"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

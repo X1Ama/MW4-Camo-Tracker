@@ -1,0 +1,35 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MasteryTracker.UpdatePanel">
+    <Grid Background="#E60D0F10">
+        <Border MaxWidth="460" Margin="12" VerticalAlignment="Center"
+                Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1"
+                CornerRadius="10" Padding="26">
+            <StackPanel>
+                <TextBlock Text="UPDATE AVAILABLE" Classes="display" FontSize="32"/>
+                <TextBlock x:Name="VersionText" Foreground="{StaticResource Muted}" Classes="mono" FontSize="12"
+                           Margin="0,2,0,18"/>
+
+                <TextBlock Text="WHAT'S NEW" Classes="label" Margin="0,0,0,8"/>
+                <Border Background="{StaticResource Panel2}" BorderBrush="{StaticResource Line}" BorderThickness="1"
+                        CornerRadius="8" Padding="14,12" MaxHeight="260">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="NotesList"/>
+                    </ScrollViewer>
+                </Border>
+                <TextBlock x:Name="NoNotesText" Text="No notes were provided for this version."
+                           Foreground="{StaticResource Muted}" FontSize="13" IsVisible="False"/>
+
+                <ProgressBar x:Name="Progress" Height="6" Margin="0,16,0,0" Minimum="0" Maximum="1" IsVisible="False"/>
+                <TextBlock x:Name="MessageText" Foreground="{StaticResource Warn}" FontSize="13"
+                           TextWrapping="Wrap" Margin="0,12,0,0" IsVisible="False"/>
+
+                <DockPanel Margin="0,18,0,0">
+                    <Button x:Name="LaterButton" DockPanel.Dock="Right" Classes="chip" Content="LATER"
+                            Margin="8,0,0,0" Padding="16,9"/>
+                    <Button x:Name="UpdateButton" Classes="chip primary" Content="UPDATE NOW" Padding="16,9"/>
+                </DockPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

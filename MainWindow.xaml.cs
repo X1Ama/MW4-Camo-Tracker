@@ -255,13 +255,14 @@ public partial class MainWindow : Window
         Presence.Replace(new HashSet<string>());
 
         var root = (Grid)Content;
-        foreach (var overlay in new UIElement?[] { adminPanel, passwordPanel, updatePanel, settingsPanel })
+        foreach (var overlay in new UIElement?[] { adminPanel, passwordPanel, updatePanel, settingsPanel, resetConfirm })
             if (overlay != null) root.Children.Remove(overlay);
         if (toastHost != null) { root.Children.Remove(toastHost); toastHost = null; }
         adminPanel = null;
         passwordPanel = null;
         updatePanel = null;
         settingsPanel = null;
+        resetConfirm = null;
 
         TrackerPanel.Children.Clear();
         ClientList.ItemsSource = null;
@@ -499,6 +500,7 @@ public partial class MainWindow : Window
             if (overlay != null) root.Children.Remove(overlay);
         adminPanel = null;
         settingsPanel = null;
+        resetConfirm = null;
 
         clients = new();
         target = null;
@@ -995,9 +997,49 @@ public partial class MainWindow : Window
         ProgressText.Text = $"{done} / {total}  \u00B7  {pct}%";
     }
 
+    ConfirmDialog? resetConfirm;
+
+    /// <summary>"Reset tab": clears every ticked camo shown on the current tab, after an "are you sure?" box.</summary>
+    async void Reset_Click(object sender, RoutedEventArgs e)
+    {
+        if (me == null || target == null || !CanEdit) return;
+        var mode = Catalog.Modes.First(m => m.Id == modeId);
+        var ids = Rows().SelectMany(w => ChipsFor(w, mode)).Select(c => c.Id)
+            .Where(id => data.Ticks.Contains(id)).Distinct().ToList();
+        var levels = data.Levels.Where(kv => kv.Value > 0).ToList();
+        if (ids.Count == 0 && levels.Count == 0) { SetStatus($"Nothing to reset in {mode.Name} yet.", true); return; }
+
+        if (resetConfirm == null)
+        {
+            resetConfirm = new ConfirmDialog();
+            Grid.SetColumnSpan(resetConfirm, 2);
+            System.Windows.Controls.Panel.SetZIndex(resetConfirm, 50);
+            ((Grid)Content).Children.Add(resetConfirm);
+        }
+        var who = target.Id == me.Id ? "your progress" : target.Label + "'s progress";
+        var body = $"This clears {ids.Count} ticked camo{(ids.Count == 1 ? "" : "s")} in the {mode.Name} tab and sets every weapon level back to 0 ({who}). This cannot be undone."
+            + (mode.Track ? " Camo Track and weapon levels are shared with the other tabs." : " Weapon levels are shared with the other tabs.");
+        if (!await resetConfirm.AskAsync($"Reset {mode.Name}?", body, "RESET")) return;
+
+        var cid = target.Id;
+        Mutate(
+            () => { foreach (var id in ids) data.Ticks.Remove(id); data.Levels.Clear(); },
+            () =>
+            {
+                foreach (var id in ids) data.Ticks.Add(id);
+                foreach (var kv in levels) data.Levels[kv.Key] = kv.Value;
+            },
+            async () =>
+            {
+                await api.ResetTicksAsync(cid, ids);
+                await api.ResetLevelsAsync(cid);
+            });
+    }
+
     void RenderCore()
     {
         if (me == null || api == null) return;
+        ResetButton.Visibility = target != null && CanEdit ? Visibility.Visible : Visibility.Collapsed;
         TrackerPanel.Children.Clear();
         cardByKey.Clear();
         groupCount.Clear();

@@ -80,6 +80,9 @@
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                     <StackPanel x:Name="FilterPanel" Orientation="Horizontal" Margin="0,0,10,0"/>
                     <TextBox x:Name="SearchBox" Width="190" TextChanged="SearchBox_TextChanged"/>
+                    <Button x:Name="ResetButton" Style="{StaticResource Chip}" Content="RESET TAB" FontSize="13" Padding="12,7"
+                            Margin="10,0,0,0" Foreground="{StaticResource Warn}" Visibility="Collapsed" Click="Reset_Click"
+                            ToolTip="Clear every ticked camo in this tab"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
                     <ProgressBar x:Name="Progress" Width="260" Height="8" Minimum="0" Maximum="100"

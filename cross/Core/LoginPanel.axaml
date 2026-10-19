@@ -1,0 +1,63 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MasteryTracker.LoginPanel">
+    <Grid Background="{StaticResource Bg}">
+        <ScrollViewer x:Name="FormScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Border MaxWidth="420" VerticalAlignment="Center">
+                <StackPanel Margin="36,32">
+                    <Viewbox Width="56" Height="56" HorizontalAlignment="Left" Margin="0,0,0,14">
+                        <Canvas Width="256" Height="256">
+                            <Rectangle Width="256" Height="256" RadiusX="56" RadiusY="56" Fill="#FFD21A"/>
+                            <Path Fill="#0D0F10" Data="M40,184 L40,72 L82,72 L128,130 L174,72 L216,72 L216,184 L182,184 L182,124 L138,178 L118,178 L74,124 L74,184 Z"/>
+                            <Path Fill="#FFD21A" Data="M134,58 L160,58 L114,204 L88,204 Z"/>
+                            <Path Fill="#FFFFFF" Data="M150,214 C176,184 200,146 230,96 C220,142 196,184 168,224 Z"/>
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Text="MW4 CAMO TRACKER" Classes="display" FontSize="38" TextWrapping="Wrap" Margin="0,2,0,24"/>
+
+                    <TextBlock Text="USER" Classes="label"/>
+                    <Border Classes="field" Margin="0,0,0,16">
+                        <TextBox x:Name="EmailBox" Classes="bare" Watermark="Enter your user name"/>
+                    </Border>
+
+                    <TextBlock Text="PASSWORD" Classes="label"/>
+                    <Border Classes="field" Margin="0,0,0,14">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox x:Name="PasswordBox" Classes="bare" PasswordChar="&#x25CF;" Watermark="Enter your password"/>
+                            <Button x:Name="ShowButton" Grid.Column="1" Classes="icon" Width="36" Height="34" Margin="0,0,6,0">
+                                <ToolTip.Tip>Show password</ToolTip.Tip>
+                                <Viewbox Width="18" Height="18">
+                                    <Canvas Width="24" Height="24">
+                                        <Path Data="M1,12 C4,6 8,4 12,4 C16,4 20,6 23,12 C20,18 16,20 12,20 C8,20 4,18 1,12 Z"
+                                              Stroke="{StaticResource Fg}" StrokeThickness="2" StrokeJoin="Round"/>
+                                        <Ellipse Canvas.Left="8" Canvas.Top="8" Width="8" Height="8"
+                                                 Stroke="{StaticResource Fg}" StrokeThickness="2"/>
+                                        <Line x:Name="EyeSlash" StartPoint="3,21" EndPoint="21,3" IsVisible="False"
+                                              Stroke="{StaticResource Fg}" StrokeThickness="2.4" StrokeLineCap="Round"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <CheckBox x:Name="RememberCheck" Classes="remember" Content="Remember me" Margin="2,0,0,20"/>
+                    <Button x:Name="SignInButton" Classes="chip primary" Content="SIGN IN" FontSize="22" Padding="14,8"/>
+
+                    <TextBlock x:Name="ErrorText" Foreground="{StaticResource Warn}" TextWrapping="Wrap"
+                               Margin="0,14,0,0" IsVisible="False"/>
+
+                    <Expander x:Name="ServerExpander" Header="Server settings" Foreground="{StaticResource Muted}"
+                              Margin="0,26,0,0">
+                        <StackPanel Margin="0,10,0,0">
+                            <TextBlock Text="SERVER URL" Classes="label"/>
+                            <TextBox x:Name="UrlBox" Margin="0,0,0,10"/>
+                            <TextBlock Text="PUBLIC KEY" Classes="label"/>
+                            <TextBox x:Name="KeyBox"/>
+                        </StackPanel>
+                    </Expander>
+                    <TextBlock x:Name="VersionText" Foreground="{StaticResource Muted}" Classes="mono" FontSize="11" Margin="0,18,0,0"/>
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

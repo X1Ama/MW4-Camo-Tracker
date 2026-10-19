@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The shared part of the Linux / macOS / Android versions: every screen, the styles, the fonts and the
+    platform helpers. The desktop program (../Desktop) and the Android app (../Android) are thin shells around it.
+    The server, live-sync and weapon-list code is shared with the Windows app through the linked files below.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>MasteryTracker.Core</AssemblyName>
+    <RootNamespace>MasteryTracker</RootNamespace>
+    <Version>0.1.18</Version>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.22" />
+  </ItemGroup>
+
+  <!-- code shared with the Windows app: the same server, live sync and weapon list -->
+  <ItemGroup>
+    <Compile Include="..\..\Api.cs" Link="Shared\Api.cs" />
+    <Compile Include="..\..\RealtimeClient.cs" Link="Shared\RealtimeClient.cs" />
+    <Compile Include="..\..\Catalog.cs" Link="Shared\Catalog.cs" />
+    <Compile Include="..\..\DemoApi.cs" Link="Shared\DemoApi.cs" />
+    <Compile Include="..\..\Timing.cs" Link="Shared\Timing.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+</Project>

@@ -357,6 +357,18 @@ public class Api
             JsonSerializer.Serialize(new[] { new { client_id = clientId, camo_id = camoId } }), Merge)
         : SendAsync(HttpMethod.Delete, $"/rest/v1/ticks?client_id=eq.{clientId}&camo_id=eq.{Uri.EscapeDataString(camoId)}");
 
+    /// <summary>Un-ticks several camos at once (the reset button).</summary>
+    public virtual Task ResetTicksAsync(string clientId, IReadOnlyCollection<string> camoIds)
+    {
+        if (camoIds.Count == 0) return Task.CompletedTask;
+        var list = string.Join(",", camoIds.Select(Uri.EscapeDataString));
+        return SendAsync(HttpMethod.Delete, $"/rest/v1/ticks?client_id=eq.{clientId}&camo_id=in.({list})");
+    }
+
+    /// <summary>Sets every weapon level for a client back to zero (the reset button).</summary>
+    public virtual Task ResetLevelsAsync(string clientId) =>
+        SendAsync(HttpMethod.Delete, $"/rest/v1/levels?client_id=eq.{clientId}");
+
     public virtual Task SetLevelAsync(string clientId, string weaponKey, int level) =>
         SendAsync(HttpMethod.Post, "/rest/v1/levels",
             JsonSerializer.Serialize(new[] { new { client_id = clientId, weapon_key = weaponKey, level } }), Merge);

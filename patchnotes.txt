@@ -1,2 +1,3 @@
-- MW4 Camo Tracker now also runs on Linux and macOS (new downloads on the release page)
-- Windows app unchanged otherwise
+- New Android app: download MW4-Camo-Tracker.apk from the release page and open it on your phone
+- RESET TAB button: clears the ticked camos in a tab and sets every weapon level back to 0 (asks first)
+- The Linux and macOS versions now share their screens with the Android app

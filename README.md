@@ -88,3 +88,19 @@ and `afplay` on macOS, and "launch when I sign in" uses an autostart entry (Linu
 
 To build one yourself: `dotnet publish cross/MasteryTracker.Cross.csproj -c Release -r linux-x64` (or `osx-arm64`,
 `osx-x64`, `win-x64`). It also runs on Windows, which is handy for trying the screens: `dotnet run --project cross -- --demo`.
+
+## Android
+
+The same Avalonia app also builds for Android (`cross/Android`), sharing every screen with the desktop version
+through `cross/Core`. On a phone it shows one column of cards, the client list in a slide-out menu, and bigger tap targets.
+
+- **Install:** download `MW4-Camo-Tracker.apk` from the latest release on your phone and open it. Android asks once to allow
+  installs from your browser or Files app.
+- **Updates:** the app checks for new versions like the other versions do. Tapping UPDATE NOW downloads the new `.apk` and
+  opens Android's installer, which asks you to confirm.
+- **Signing:** every release is signed with the same key (GitHub secrets `ANDROID_KEYSTORE_B64` and
+  `ANDROID_KEYSTORE_PASSWORD`), which is what lets a new version install over the old one. Keep a copy of that key; if it is
+  lost, everyone has to uninstall and reinstall once. Without the secrets the workflow still builds, using a throw-away key.
+- **Build it yourself:** needs the .NET 8 SDK with the `android` workload and a JDK 17:
+  `dotnet publish cross/Android/MasteryTracker.Android.csproj -c Release -f net8.0-android -p:AndroidPackageFormat=apk`
+- To preview the phone layout on a computer: `dotnet run --project cross/Desktop -- --demo --phone`.

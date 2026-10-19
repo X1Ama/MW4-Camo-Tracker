@@ -1,0 +1,8 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MasteryTracker.MainWindow"
+        Title="MW4 Camo Tracker" Width="1200" Height="800" MinWidth="360" MinHeight="520"
+        WindowStartupLocation="CenterScreen"
+        Icon="avares://MasteryTracker.Core/Assets/app.png"
+        Background="{StaticResource Bg}">
+</Window>

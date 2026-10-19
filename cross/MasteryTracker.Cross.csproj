@@ -12,7 +12,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>MasteryCamoTracker</AssemblyName>
     <RootNamespace>MasteryTracker</RootNamespace>
-    <Version>0.1.15</Version>
+    <Version>0.1.16</Version>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>

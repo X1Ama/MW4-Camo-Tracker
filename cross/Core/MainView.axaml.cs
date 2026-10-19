@@ -96,6 +96,8 @@ public partial class MainView : UserControl
         AdminButton.Click += (_, _) => Admin_Click();
         SettingsButton.Click += (_, _) => Settings_Click();
         ResetButton.Click += (_, _) => Reset_Click();
+        SaveButton.Click += (_, _) => Save_Click();
+        RestoreButton.Click += (_, _) => Restore_Click();
         MenuButton.Click += (_, _) => SetDrawer(!drawerOpen);
         SizeChanged += (_, e) => OnWidthChanged(e.NewSize.Width);
         ClientList.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<Profile>((p, _) => ClientRow(p));
@@ -221,20 +223,22 @@ public partial class MainView : UserControl
     /// <summary>Lays the progress bar, filters, search box and reset button out for a wide or a narrow screen.</summary>
     void BuildFilterRow()
     {
-        foreach (var part in new Control[] { ProgressBox, FilterPanel, SearchBox, ResetButton })
+        foreach (var part in new Control[] { ProgressBox, FilterPanel, SearchBox, SaveButton, RestoreButton, ResetButton })
             (part.Parent as Panel)?.Children.Remove(part);
         ProgressBox.Margin = Compact ? new Thickness(0, 0, 0, 8) : new Thickness(0, 0, 16, 0);
         Progress.Width = Compact ? 150 : 260;
         FilterPanel.Margin = Compact ? new Thickness(0, 0, 8, 0) : new Thickness(0, 0, 10, 0);
         SearchBox.Width = Compact ? 130 : 190;
         SearchBox.Margin = Compact ? new Thickness(0, 0, 8, 0) : new Thickness(0);
-        ResetButton.Margin = Compact ? new Thickness(0) : new Thickness(10, 0, 0, 0);
+        SaveButton.Margin = RestoreButton.Margin = ResetButton.Margin = Compact ? new Thickness(0, 0, 8, 0) : new Thickness(10, 0, 0, 0);
 
         if (Compact)
         {
             var line = new WrapPanel { Orientation = Orientation.Horizontal };
             line.Children.Add(FilterPanel);
             line.Children.Add(SearchBox);
+            line.Children.Add(SaveButton);
+            line.Children.Add(RestoreButton);
             line.Children.Add(ResetButton);
             var stack = new StackPanel();
             stack.Children.Add(ProgressBox);
@@ -247,6 +251,8 @@ public partial class MainView : UserControl
             var right = new StackPanel { Orientation = Orientation.Horizontal };
             right.Children.Add(FilterPanel);
             right.Children.Add(SearchBox);
+            right.Children.Add(SaveButton);
+            right.Children.Add(RestoreButton);
             right.Children.Add(ResetButton);
             DockPanel.SetDock(right, Dock.Right);
             dock.Children.Add(right);

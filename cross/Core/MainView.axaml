@@ -70,6 +70,14 @@
                 </StackPanel>
                 <StackPanel x:Name="FilterPanel" Orientation="Horizontal" Margin="0,0,10,0"/>
                 <TextBox x:Name="SearchBox" Width="190"/>
+                <Button x:Name="SaveButton" Classes="chip" Content="SAVE" FontSize="17" Padding="12,5"
+                        Margin="10,0,0,0" IsVisible="False">
+                    <ToolTip.Tip>Save a copy of this progress to a file</ToolTip.Tip>
+                </Button>
+                <Button x:Name="RestoreButton" Classes="chip" Content="RESTORE" FontSize="17" Padding="12,5"
+                        Margin="10,0,0,0" IsVisible="False">
+                    <ToolTip.Tip>Put back the last saved copy</ToolTip.Tip>
+                </Button>
                 <Button x:Name="ResetButton" Classes="chip" Content="RESET TAB" FontSize="17" Padding="12,5"
                         Margin="10,0,0,0" Foreground="{StaticResource Warn}" IsVisible="False">
                     <ToolTip.Tip>Clear every ticked camo and weapon level</ToolTip.Tip>

@@ -207,7 +207,7 @@ public partial class AdminPanel : UserControl
         DetailSub.Text = $"{selected.UserName}  ·  {Catalog.RoleLabel(selected.Role)}";
         loadingDetail = true;
         DetailName.Text = selected.DisplayName;
-        DetailPass.Text = "";
+        DetailPass.Text = knownPass.GetValueOrDefault(selected.UserName, "");
         DetailRole.SelectedItem = DetailRole.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string?)i.Tag == selected.Role);
         loadingDetail = false;
 
@@ -299,7 +299,8 @@ public partial class AdminPanel : UserControl
             return;
         }
         CreateButton.IsEnabled = false;
-        await RunAsync(() => api.CreateUserAsync(user, pass, name, role), $"Created {user}. Give them the user name and password.");
+        await RunAsync(() => api.CreateUserAsync(user, pass, name, role), $"Created. User name: {user}   Password: {pass}");
+        knownPass[user] = pass;
         if (MessageText.Foreground == MainView.Res("Accent"))
         {
             NewUser.Text = ""; NewPass.Text = ""; NewName.Text = "";
@@ -314,13 +315,18 @@ public partial class AdminPanel : UserControl
         await RunAsync(() => api.SetDisplayNameAsync(id, DetailName.Text?.Trim() ?? ""), "Display name saved.");
     }
 
+    // passwords cannot be read back from the server, so this keeps the ones set in this session to show them again
+    readonly Dictionary<string, string> knownPass = new();
+
     async void SetPassword_Click(object? sender, RoutedEventArgs e)
     {
         if (selected == null) return;
         var pass = DetailPass.Text ?? "";
         if (pass.Length < 6) { Say("Password must be at least 6 characters.", false); return; }
         var id = selected.Id;
-        await RunAsync(() => api.SetPasswordAsync(id, pass), "Password changed.");
+        var userName = selected.UserName;
+        knownPass[userName] = pass;
+        await RunAsync(() => api.SetPasswordAsync(id, pass), $"Password set. User name: {userName}   Password: {pass}");
     }
 
     async void SetRole_Click(object? sender, RoutedEventArgs e)

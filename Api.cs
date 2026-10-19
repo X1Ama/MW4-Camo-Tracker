@@ -369,6 +369,17 @@ public class Api
     public virtual Task ResetLevelsAsync(string clientId) =>
         SendAsync(HttpMethod.Delete, $"/rest/v1/levels?client_id=eq.{clientId}");
 
+    /// <summary>Puts back saved ticks and levels in one request each (the restore button).</summary>
+    public virtual async Task RestoreAsync(string clientId, IReadOnlyCollection<string> camoIds, IReadOnlyDictionary<string, int> levels)
+    {
+        if (camoIds.Count > 0)
+            await SendAsync(HttpMethod.Post, "/rest/v1/ticks",
+                JsonSerializer.Serialize(camoIds.Select(c => new { client_id = clientId, camo_id = c })), Merge);
+        if (levels.Count > 0)
+            await SendAsync(HttpMethod.Post, "/rest/v1/levels",
+                JsonSerializer.Serialize(levels.Select(kv => new { client_id = clientId, weapon_key = kv.Key, level = kv.Value })), Merge);
+    }
+
     public virtual Task SetLevelAsync(string clientId, string weaponKey, int level) =>
         SendAsync(HttpMethod.Post, "/rest/v1/levels",
             JsonSerializer.Serialize(new[] { new { client_id = clientId, weapon_key = weaponKey, level } }), Merge);

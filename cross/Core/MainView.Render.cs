@@ -64,6 +64,8 @@ public partial class MainView
         if (!await resetConfirm.AskAsync($"Reset {mode.Name}?", body, "RESET")) return;
 
         var cid = target.Id;
+        try { Backups.Save(cid, target.Label, data, "before-reset"); }      // safety copy so a reset can be undone
+        catch { }
         Mutate(
             () => { foreach (var id in ids) data.Ticks.Remove(id); data.Levels.Clear(); },
             () =>
@@ -76,6 +78,42 @@ public partial class MainView
                 await api.ResetTicksAsync(cid, ids);
                 await api.ResetLevelsAsync(cid);
             });
+    }
+
+    /// <summary>"Save": writes the ticks and levels to a backup file.</summary>
+    void Save_Click()
+    {
+        if (me == null || target == null || !CanEdit) return;
+        try { SetStatus("Saved to " + Backups.Save(target.Id, target.Label, data), true); }
+        catch (Exception ex) { SetStatus("Could not save: " + ex.Message, false); }
+    }
+
+    /// <summary>"Restore": puts back the newest saved copy (adds the saved camos and levels back).</summary>
+    async void Restore_Click()
+    {
+        if (me == null || target == null || !CanEdit) return;
+        var snap = Backups.Latest(target.Id);
+        if (snap == null) { SetStatus("No saved copy found yet. Press SAVE first.", true); return; }
+
+        if (resetConfirm == null)
+        {
+            resetConfirm = new ConfirmDialog();
+            AddOverlay(resetConfirm, 50);
+        }
+        var body = $"Puts back {snap.Ticks.Count} camos and {snap.Levels.Count(kv => kv.Value > 0)} weapon levels from the copy saved on {snap.Saved:g}.";
+        if (!await resetConfirm.AskAsync("Restore saved progress?", body, "RESTORE")) return;
+
+        var cid = target.Id;
+        var oldTicks = data.Ticks.ToList();
+        var oldLevels = new Dictionary<string, int>(data.Levels);
+        Mutate(
+            () => { foreach (var t in snap.Ticks) data.Ticks.Add(t); foreach (var kv in snap.Levels) data.Levels[kv.Key] = kv.Value; },
+            () =>
+            {
+                data.Ticks.Clear(); foreach (var t in oldTicks) data.Ticks.Add(t);
+                data.Levels.Clear(); foreach (var kv in oldLevels) data.Levels[kv.Key] = kv.Value;
+            },
+            () => api.RestoreAsync(cid, snap.Ticks, snap.Levels));
     }
 
     void Render() => RenderCore();
@@ -189,7 +227,7 @@ public partial class MainView
     void RenderCore()
     {
         if (me == null || api == null) return;
-        ResetButton.IsVisible = target != null && CanEdit;
+        SaveButton.IsVisible = RestoreButton.IsVisible = ResetButton.IsVisible = target != null && CanEdit;
         TrackerPanel.Children.Clear();
         cardByKey.Clear();
         groupCount.Clear();

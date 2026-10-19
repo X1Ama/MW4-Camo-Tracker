@@ -1022,6 +1022,8 @@ public partial class MainWindow : Window
         if (!await resetConfirm.AskAsync($"Reset {mode.Name}?", body, "RESET")) return;
 
         var cid = target.Id;
+        try { Backups.Save(cid, target.Label, data, "before-reset"); }      // safety copy so a reset can be undone
+        catch { }
         Mutate(
             () => { foreach (var id in ids) data.Ticks.Remove(id); data.Levels.Clear(); },
             () =>
@@ -1036,10 +1038,52 @@ public partial class MainWindow : Window
             });
     }
 
+    /// <summary>"Save": writes the ticks and levels to a file in Documents\MW4 Camo Tracker\Backups.</summary>
+    void Save_Click(object sender, RoutedEventArgs e)
+    {
+        if (me == null || target == null || !CanEdit) return;
+        try
+        {
+            var path = Backups.Save(target.Id, target.Label, data);
+            SetStatus("Saved to " + path, true);
+        }
+        catch (Exception ex) { SetStatus("Could not save: " + ex.Message, false); }
+    }
+
+    /// <summary>"Restore": puts back the newest saved copy (adds the saved camos and levels back).</summary>
+    async void Restore_Click(object sender, RoutedEventArgs e)
+    {
+        if (me == null || target == null || !CanEdit) return;
+        var snap = Backups.Latest(target.Id);
+        if (snap == null) { SetStatus("No saved copy found yet. Press SAVE first.", true); return; }
+
+        if (resetConfirm == null)
+        {
+            resetConfirm = new ConfirmDialog();
+            Grid.SetColumnSpan(resetConfirm, 2);
+            System.Windows.Controls.Panel.SetZIndex(resetConfirm, 50);
+            ((Grid)Content).Children.Add(resetConfirm);
+        }
+        var body = $"Puts back {snap.Ticks.Count} camos and {snap.Levels.Count(kv => kv.Value > 0)} weapon levels from the copy saved on {snap.Saved:g}.";
+        if (!await resetConfirm.AskAsync("Restore saved progress?", body, "RESTORE")) return;
+
+        var cid = target.Id;
+        var oldTicks = data.Ticks.ToList();
+        var oldLevels = new Dictionary<string, int>(data.Levels);
+        Mutate(
+            () => { foreach (var t in snap.Ticks) data.Ticks.Add(t); foreach (var kv in snap.Levels) data.Levels[kv.Key] = kv.Value; },
+            () =>
+            {
+                data.Ticks.Clear(); foreach (var t in oldTicks) data.Ticks.Add(t);
+                data.Levels.Clear(); foreach (var kv in oldLevels) data.Levels[kv.Key] = kv.Value;
+            },
+            () => api!.RestoreAsync(cid, snap.Ticks, snap.Levels));
+    }
+
     void RenderCore()
     {
         if (me == null || api == null) return;
-        ResetButton.Visibility = target != null && CanEdit ? Visibility.Visible : Visibility.Collapsed;
+        SaveButton.Visibility = RestoreButton.Visibility = ResetButton.Visibility = target != null && CanEdit ? Visibility.Visible : Visibility.Collapsed;
         TrackerPanel.Children.Clear();
         cardByKey.Clear();
         groupCount.Clear();

@@ -78,6 +78,13 @@ public sealed class DemoApi : Api
         return Task.CompletedTask;
     }
 
+    public override Task RestoreAsync(string clientId, IReadOnlyCollection<string> camoIds, IReadOnlyDictionary<string, int> levels)
+    {
+        foreach (var id in camoIds) Data(clientId).Ticks.Add(id);
+        foreach (var kv in levels) Data(clientId).Levels[kv.Key] = kv.Value;
+        return Task.CompletedTask;
+    }
+
     public override Task SetLevelAsync(string clientId, string weaponKey, int level)
     {
         Data(clientId).Levels[weaponKey] = level;

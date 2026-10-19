@@ -89,6 +89,9 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           sed -i "s|<Version>[^<]*</Version>|<Version>$VERSION</Version>|" cross/Core/MasteryTracker.Core.csproj
           sed -i "s|<Version>[^<]*</Version>|<Version>$VERSION</Version>|; s|<ApplicationDisplayVersion>[^<]*</ApplicationDisplayVersion>|<ApplicationDisplayVersion>$VERSION</ApplicationDisplayVersion>|" cross/Android/MasteryTracker.Android.csproj
+          # the GitHub machine has newer .NET versions too; cross/Android/global.json makes this folder use .NET 8
+          cd cross/Android
+          dotnet --version
           dotnet workload install android
           SIGN=""
           if [ -n "$KEYSTORE_B64" ]; then
@@ -98,12 +101,12 @@ jobs:
             echo "No signing key set up: building with a throw-away key (updates will not install over earlier builds)."
           fi
           # a number that grows with every release (Android refuses to install an older number over a newer one)
-          dotnet publish cross/Android/MasteryTracker.Android.csproj -c Release -f net8.0-android \
+          dotnet publish MasteryTracker.Android.csproj -c Release -f net8.0-android \
             -p:AndroidPackageFormat=apk -p:ApplicationVersion=$GITHUB_RUN_NUMBER $SIGN
-          mkdir -p dist
-          apk=$(find cross/Android/bin -name "*-Signed.apk" | head -n 1)
-          cp "$apk" dist/MW4-Camo-Tracker.apk
-          ls -la dist
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          apk=$(find bin -name "*-Signed.apk" | head -n 1)
+          cp "$apk" "$GITHUB_WORKSPACE/dist/MW4-Camo-Tracker.apk"
+          ls -la "$GITHUB_WORKSPACE/dist"
       - name: Show why the Android build failed
         if: failure()
         run: echo "::error::$(tail -n 30 build.log | tr '\n' '|')"

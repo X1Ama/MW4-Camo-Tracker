@@ -1,6 +1,9 @@
-# Push a tag like v0.2.0 and GitHub builds the exe and publishes the release for you.
+# Push a tag like v0.2.0 and GitHub builds every download and publishes the release for you.
 #   git tag v0.2.0
 #   git push origin v0.2.0
+#
+# Windows (the WPF app in the repository root) is the main release. Linux and macOS builds (the Avalonia app in
+# cross/) are added to the same release when they succeed; if one of them fails, Windows still ships.
 # To force everyone to update, edit update.json on the release and set "required": true.
 name: Release
 
@@ -12,7 +15,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,26 +37,120 @@ jobs:
             Set-Content MasteryTracker.csproj -Encoding UTF8
           dotnet publish MasteryTracker.csproj -c Release -r win-x64 -o out
 
-      - name: Write update.json
-        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-windows
+          path: out/MasteryCamoTracker.exe
+
+  linux:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build both Linux flavours
         run: |
-          $repo = "${{ github.repository }}"
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s|<Version>[^<]*</Version>|<Version>$VERSION</Version>|" cross/MasteryTracker.Cross.csproj
+          mkdir -p dist
+          for rid in linux-x64 linux-arm64; do
+            dotnet publish cross/MasteryTracker.Cross.csproj -c Release -r $rid -o out/$rid
+            # the file the in-app updater downloads
+            cp out/$rid/MasteryCamoTracker dist/MasteryCamoTracker-$rid
+            # the download for a first install (keeps the "executable" flag)
+            chmod +x out/$rid/MasteryCamoTracker
+            tar -C out/$rid -czf dist/MW4-Camo-Tracker-$rid.tar.gz MasteryCamoTracker
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-linux
+          path: dist/*
+
+  macos:
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build both Mac flavours
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i '' "s|<Version>[^<]*</Version>|<Version>$VERSION</Version>|" cross/MasteryTracker.Cross.csproj
+          mkdir -p dist
+
+          # one icon file from the 1024 px picture
+          mkdir -p app.iconset
+          for s in 16 32 64 128 256 512; do
+            sips -z $s $s cross/packaging/app-1024.png --out app.iconset/icon_${s}x${s}.png >/dev/null
+            sips -z $((s*2)) $((s*2)) cross/packaging/app-1024.png --out app.iconset/icon_${s}x${s}@2x.png >/dev/null
+          done
+          iconutil -c icns app.iconset -o app.icns
+
+          for rid in osx-arm64 osx-x64; do
+            dotnet publish cross/MasteryTracker.Cross.csproj -c Release -r $rid -o out/$rid
+            chmod +x out/$rid/MasteryCamoTracker
+            # ad-hoc signature: Apple Silicon refuses to start programs that carry none
+            codesign --force -s - out/$rid/MasteryCamoTracker
+            for lib in out/$rid/*.dylib; do codesign --force -s - "$lib"; done
+
+            # the file the in-app updater downloads: the program and its libraries
+            (cd out/$rid && zip -qr "../../dist/MasteryCamoTracker-$rid.zip" .)
+
+            # the .app for a first install
+            app="MW4 Camo Tracker.app"
+            rm -rf "$app"
+            mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+            cp -R out/$rid/. "$app/Contents/MacOS/"
+            cp app.icns "$app/Contents/Resources/app.icns"
+            sed "s|__VERSION__|$VERSION|g" cross/packaging/Info.plist > "$app/Contents/Info.plist"
+            codesign --force --deep -s - "$app"
+            ditto -c -k --keepParent "$app" "dist/MW4-Camo-Tracker-macOS-$rid.zip"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-macos
+          path: dist/*
+
+  release:
+    needs: [windows, linux, macos]
+    if: ${{ always() && needs.windows.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Write update.json
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BASE="https://github.com/${{ github.repository }}/releases/latest/download"
           # the patch notes shown on the update screen come from patchnotes.txt (one "- " line per change)
-          $notes = @()
-          if (Test-Path patchnotes.txt) {
-            $notes = @(Get-Content patchnotes.txt | Where-Object { $_ -match '^\s*[-*]\s+\S' } | ForEach-Object { ($_ -replace '^\s*[-*]\s+', '').Trim() })
-          }
-          $manifest = [ordered]@{
-            version  = $env:VERSION
-            url      = "https://github.com/$repo/releases/latest/download/MasteryCamoTracker.exe"
-            notes    = $notes
-            required = $false
-          } | ConvertTo-Json -Depth 4
-          Set-Content -Path out/update.json -Value $manifest -Encoding UTF8
+          notes='[]'
+          if [ -f patchnotes.txt ]; then
+            notes=$(grep -E '^\s*[-*]\s+\S' patchnotes.txt | sed -E 's/^\s*[-*]\s+//; s/\r$//' | jq -R . | jq -s .)
+          fi
+          # a download is only advertised when it was really built
+          assets='{}'
+          for rid in linux-x64 linux-arm64; do
+            [ -f "artifacts/MasteryCamoTracker-$rid" ] && assets=$(echo "$assets" | jq --arg k "$rid" --arg v "$BASE/MasteryCamoTracker-$rid" '. + {($k): $v}')
+          done
+          for rid in osx-arm64 osx-x64; do
+            [ -f "artifacts/MasteryCamoTracker-$rid.zip" ] && assets=$(echo "$assets" | jq --arg k "$rid" --arg v "$BASE/MasteryCamoTracker-$rid.zip" '. + {($k): $v}')
+          done
+          jq -n --arg version "$VERSION" --arg url "$BASE/MasteryCamoTracker.exe" \
+                --argjson notes "$notes" --argjson assets "$assets" \
+                '{version: $version, url: $url, notes: $notes, required: false, assets: $assets}' > artifacts/update.json
+          cat artifacts/update.json
+          ls -la artifacts
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            out/MasteryCamoTracker.exe
-            out/update.json
+          files: artifacts/*

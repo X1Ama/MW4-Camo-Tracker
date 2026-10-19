@@ -1,0 +1,249 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Style Selector="Window">
+        <Setter Property="Background" Value="{DynamicResource Bg}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+        <Setter Property="FontFamily" Value="{DynamicResource Body}"/>
+    </Style>
+
+    <Style Selector="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource Body}"/>
+    </Style>
+    <Style Selector="TextBlock.display">
+        <Setter Property="FontFamily" Value="{DynamicResource Display}"/>
+    </Style>
+    <Style Selector="TextBlock.mono">
+        <Setter Property="FontFamily" Value="{DynamicResource Mono}"/>
+    </Style>
+    <Style Selector="TextBlock.label">
+        <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Margin" Value="0,0,0,4"/>
+    </Style>
+
+    <!-- the angular-ish button used for actions -->
+    <Style Selector="Button.chip">
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Background" Value="{DynamicResource Panel2}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="FontFamily" Value="{DynamicResource Display}"/>
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{Binding $parent[Button].Background}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Muted}"/>
+        <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}"/>
+    </Style>
+    <Style Selector="Button.chip:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{Binding $parent[Button].Background}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Muted}"/>
+        <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}"/>
+    </Style>
+    <Style Selector="Button.chip:disabled">
+        <Setter Property="Opacity" Value="0.55"/>
+    </Style>
+    <Style Selector="Button.primary">
+        <Setter Property="Background" Value="{DynamicResource Accent}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AccentFg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="Button.center">
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    </Style>
+
+    <!-- a flat icon button (the eye on the password box) -->
+    <Style Selector="Button.icon">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="7"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Panel2}"/>
+    </Style>
+
+    <!-- text boxes: rounded, dark, a grey outline when focused -->
+    <Style Selector="TextBox">
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CaretBrush" Value="{DynamicResource Fg}"/>
+        <Setter Property="MinHeight" Value="0"/>
+    </Style>
+    <Style Selector="TextBox.bare">
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="8,0,12,0"/>
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Stretch"/>
+    </Style>
+    <Style Selector="TextBox.bare:pointerover /template/ Border#PART_BorderElement, TextBox.bare:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <!-- the rounded field that holds the user name and password boxes -->
+    <Style Selector="Border.field">
+        <Setter Property="Background" Value="{DynamicResource Panel}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Height" Value="46"/>
+    </Style>
+    <Style Selector="Border.field:focus-within">
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+    </Style>
+
+    <Style Selector="Border.card">
+        <Setter Property="Background" Value="{DynamicResource Panel}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+    </Style>
+
+    <!-- client list -->
+    <Style Selector="ListBoxItem">
+        <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+        <Setter Property="Padding" Value="12,9"/>
+        <Setter Property="Margin" Value="6,1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="BorderThickness" Value="3,0,0,0"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Panel2}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+    </Style>
+    <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Panel2}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+    </Style>
+    <Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Panel2}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+    </Style>
+
+    <Style Selector="ComboBox">
+        <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="10,6"/>
+        <Setter Property="FontSize" Value="14"/>
+    </Style>
+
+    <Style Selector="ProgressBar">
+        <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        <Setter Property="Background" Value="{DynamicResource Panel2}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="MinHeight" Value="0"/>
+    </Style>
+    <Style Selector="ProgressBar /template/ Border#PART_Indicator">
+        <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+
+    <!-- tick boxes: the "Remember me" look used in the sign-in screen and settings -->
+    <Style Selector="CheckBox.remember">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <StackPanel Orientation="Horizontal" Background="Transparent">
+                    <Grid Width="20" Height="20" VerticalAlignment="Center">
+                        <Border Name="Fill" CornerRadius="6" Background="Transparent"/>
+                        <Border Name="Box" CornerRadius="6" BorderThickness="1.5" BorderBrush="{DynamicResource Muted}"/>
+                        <Path Name="Tick" Data="M0,4 L3.6,7.6 L10,0.6" Width="10" Height="8" Stretch="Fill"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" Stroke="{DynamicResource AccentFg}"
+                              StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round" IsVisible="False"/>
+                    </Grid>
+                    <ContentPresenter Name="PART_ContentPresenter" Margin="10,0,0,0" VerticalAlignment="Center"
+                                      Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      Foreground="{TemplateBinding Foreground}" RecognizesAccessKey="True"/>
+                </StackPanel>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="CheckBox.remember:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+    </Style>
+    <Style Selector="CheckBox.remember:pointerover /template/ Border#Box">
+        <Setter Property="BorderBrush" Value="{DynamicResource Fg}"/>
+    </Style>
+    <Style Selector="CheckBox.remember:checked">
+        <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+    </Style>
+    <Style Selector="CheckBox.remember:checked /template/ Border#Fill">
+        <Setter Property="Background" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="CheckBox.remember:checked /template/ Border#Box">
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="CheckBox.remember:checked /template/ Path#Tick">
+        <Setter Property="IsVisible" Value="True"/>
+    </Style>
+
+    <!-- the card-shaped tick box used for the clients a Grinder manages -->
+    <Style Selector="CheckBox.pill">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="Card" Background="{DynamicResource Panel2}" BorderBrush="{DynamicResource Line}"
+                        BorderThickness="1" CornerRadius="8" Padding="12,10">
+                    <StackPanel Orientation="Horizontal">
+                        <Grid Width="20" Height="20" VerticalAlignment="Center">
+                            <Border Name="Fill" CornerRadius="6" Background="Transparent"/>
+                            <Border Name="Box" CornerRadius="6" BorderThickness="1.5" BorderBrush="{DynamicResource Muted}"/>
+                            <Path Name="Tick" Data="M0,4 L3.6,7.6 L10,0.6" Width="10" Height="8" Stretch="Fill"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" Stroke="{DynamicResource AccentFg}"
+                                  StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round" IsVisible="False"/>
+                        </Grid>
+                        <ContentPresenter Name="PART_ContentPresenter" Margin="12,0,0,0" VerticalAlignment="Center"
+                                          Content="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}"/>
+                    </StackPanel>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="CheckBox.pill:pointerover /template/ Border#Card">
+        <Setter Property="BorderBrush" Value="{DynamicResource Muted}"/>
+    </Style>
+    <Style Selector="CheckBox.pill:checked /template/ Border#Card">
+        <Setter Property="Background" Value="{DynamicResource DoneTint}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource DoneLine}"/>
+    </Style>
+    <Style Selector="CheckBox.pill:checked /template/ Border#Fill">
+        <Setter Property="Background" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="CheckBox.pill:checked /template/ Border#Box">
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="CheckBox.pill:checked /template/ Path#Tick">
+        <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="CheckBox.pill:disabled">
+        <Setter Property="Opacity" Value="0.55"/>
+    </Style>
+
+    <Style Selector="ToolTip">
+        <Setter Property="Background" Value="{DynamicResource Panel2}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}"/>
+    </Style>
+
+</Styles>

@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MasteryTracker.AdminPanel">
+    <Grid x:Name="Root" Background="{StaticResource Bg}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <TextBlock x:Name="CountText" DockPanel.Dock="Top" Text="PEOPLE" Classes="display" FontSize="22"
+                           Foreground="{StaticResource Muted}" Margin="16,16,16,8"/>
+                <Button x:Name="NewUserButton" DockPanel.Dock="Top" Classes="chip" Content="+ NEW USER" Margin="12,0,12,10"
+                        Padding="12,8" FontSize="16"/>
+                <TextBox x:Name="UserSearch" DockPanel.Dock="Top" Margin="12,0,12,10"/>
+                <ListBox x:Name="UserList" Background="Transparent" BorderThickness="0"/>
+            </DockPanel>
+        </Border>
+
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="28,20,28,28">
+                <DockPanel>
+                    <Button x:Name="BackButton" DockPanel.Dock="Right" Classes="chip" Content="BACK TO TRACKER"
+                            FontSize="15" Padding="12,7" VerticalAlignment="Center"/>
+                    <TextBlock Text="ADMIN PANEL" Classes="display" FontSize="38"/>
+                </DockPanel>
+                <TextBlock x:Name="MessageText" TextWrapping="Wrap" Margin="0,4,0,0" Classes="mono" FontSize="12"
+                           Foreground="{StaticResource Muted}"/>
+
+                <StackPanel x:Name="CreatePanel">
+                    <TextBlock Text="CREATE USER" Classes="display" FontSize="22"
+                               Foreground="{StaticResource Muted}" Margin="0,22,0,8"/>
+                    <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" Padding="16" CornerRadius="8">
+                        <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,Auto,Auto">
+                            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,12">
+                                <TextBlock Text="USER NAME" Classes="label"/>
+                                <TextBox x:Name="NewUser" MaxLength="32"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,12">
+                                <TextBlock Text="PASSWORD (6+ CHARACTERS)" Classes="label"/>
+                                <TextBox x:Name="NewPass"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,12">
+                                <TextBlock Text="DISPLAY NAME (OPTIONAL)" Classes="label"/>
+                                <TextBox x:Name="NewName"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,0,0,12">
+                                <TextBlock Text="ROLE" Classes="label"/>
+                                <ComboBox x:Name="NewRole" Padding="8,6" HorizontalAlignment="Stretch"/>
+                            </StackPanel>
+                            <Button x:Name="CreateButton" Grid.Row="2" Grid.ColumnSpan="3" Classes="chip primary"
+                                    Content="CREATE USER" HorizontalAlignment="Left" Padding="18,9"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- selected user -->
+                <StackPanel x:Name="DetailPanel" IsVisible="False">
+                    <TextBlock x:Name="DetailTitle" Classes="display" FontSize="28" Margin="0,28,0,2"/>
+                    <TextBlock x:Name="DetailSub" Foreground="{StaticResource Fg}" Classes="mono" FontSize="14"/>
+
+                    <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1"
+                            Padding="16" Margin="0,12,0,0" CornerRadius="8">
+                        <StackPanel>
+                            <TextBlock Text="DISPLAY NAME" Classes="label"/>
+                            <DockPanel Margin="0,0,0,14">
+                                <Button x:Name="SaveNameButton" DockPanel.Dock="Right" Classes="chip" Content="SAVE" Margin="8,0,0,0"/>
+                                <TextBox x:Name="DetailName"/>
+                            </DockPanel>
+
+                            <TextBlock Text="NEW PASSWORD" Classes="label"/>
+                            <DockPanel Margin="0,0,0,14">
+                                <Button x:Name="SetPasswordButton" DockPanel.Dock="Right" Classes="chip" Content="SET PASSWORD" Margin="8,0,0,0"/>
+                                <TextBox x:Name="DetailPass"/>
+                            </DockPanel>
+
+                            <StackPanel x:Name="RoleRow">
+                                <TextBlock Text="ROLE" Classes="label"/>
+                                <DockPanel Margin="0,0,0,14">
+                                    <Button x:Name="SetRoleButton" DockPanel.Dock="Right" Classes="chip" Content="SET ROLE" Margin="8,0,0,0"/>
+                                    <ComboBox x:Name="DetailRole" Padding="8,6" HorizontalAlignment="Stretch"/>
+                                </DockPanel>
+                            </StackPanel>
+
+                            <Button x:Name="DeleteButton" Classes="chip" Content="DELETE USER"
+                                    HorizontalAlignment="Left" Foreground="{StaticResource Warn}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel x:Name="AssignPanel" IsVisible="False">
+                        <TextBlock Text="CLIENTS THIS GRINDER MANAGES" Classes="display" FontSize="22"
+                                   Foreground="{StaticResource Muted}" Margin="0,22,0,8"/>
+                        <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" Padding="16" CornerRadius="8">
+                            <WrapPanel x:Name="AssignList"/>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

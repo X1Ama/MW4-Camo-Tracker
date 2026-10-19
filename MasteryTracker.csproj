@@ -10,7 +10,7 @@
     <RootNamespace>MasteryTracker</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.1.14</Version>
+    <Version>0.1.15</Version>
     <!-- keep only the English WPF resources (drops about a dozen language packs) -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <!-- one fewer background GC thread and less memory held back -->
@@ -27,6 +27,14 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
+
+  <!-- the Linux/macOS version lives in cross\ and is built separately -->
+  <ItemGroup>
+    <Compile Remove="cross\**" />
+    <EmbeddedResource Remove="cross\**" />
+    <None Remove="cross\**" />
+    <Page Remove="cross\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <Resource Include="app.ico" />

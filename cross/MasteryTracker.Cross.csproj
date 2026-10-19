@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Linux and macOS version of MW4 Camo Tracker (it also runs on Windows, which is handy for testing).
+    The Windows app in the folder above stays a WPF program; this one is built on Avalonia and re-uses its
+    server, sync and catalog code through the linked files below.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>MasteryCamoTracker</AssemblyName>
+    <RootNamespace>MasteryTracker</RootNamespace>
+    <Version>0.1.15</Version>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>false</TieredPGO>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+  </PropertyGroup>
+
+  <!-- dotnet publish -c Release -r linux-x64 (or osx-arm64, osx-x64, win-x64) gives one self-contained file -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.22" />
+  </ItemGroup>
+
+  <!-- code shared with the Windows app: the same server, live sync and weapon list -->
+  <ItemGroup>
+    <Compile Include="..\Api.cs" Link="Shared\Api.cs" />
+    <Compile Include="..\RealtimeClient.cs" Link="Shared\RealtimeClient.cs" />
+    <Compile Include="..\Catalog.cs" Link="Shared\Catalog.cs" />
+    <Compile Include="..\DemoApi.cs" Link="Shared\DemoApi.cs" />
+    <Compile Include="..\Timing.cs" Link="Shared\Timing.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+</Project>

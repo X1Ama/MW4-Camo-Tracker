@@ -1,5 +1,2 @@
-- Much lighter on memory: unused memory is handed back to Windows while you use the app
-- Ticking a camo or changing a level is instant: only that card is redrawn
-- Switching a role fades smoothly and keeps the live connection
-- A chime plays with the client-online banner (can be switched off in Settings)
-- DONE button on the Settings page is centred
+- MW4 Camo Tracker now also runs on Linux and macOS (new downloads on the release page)
+- Windows app unchanged otherwise

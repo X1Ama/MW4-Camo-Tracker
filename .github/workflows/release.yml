@@ -96,7 +96,7 @@ jobs:
             chmod +x out/$rid/MasteryCamoTracker
             # ad-hoc signature: Apple Silicon refuses to start programs that carry none
             codesign --force -s - out/$rid/MasteryCamoTracker
-            for lib in out/$rid/*.dylib; do codesign --force -s - "$lib"; done
+            for lib in out/$rid/*.dylib; do [ -e "$lib" ] || continue; codesign --force -s - "$lib"; done
 
             # the file the in-app updater downloads: the program and its libraries
             (cd out/$rid && zip -qr "../../dist/MasteryCamoTracker-$rid.zip" .)

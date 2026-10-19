@@ -11,7 +11,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>MasteryTracker.Core</AssemblyName>
     <RootNamespace>MasteryTracker</RootNamespace>
-    <Version>0.1.21</Version>
+    <Version>0.1.22</Version>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>

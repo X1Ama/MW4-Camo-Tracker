@@ -76,7 +76,17 @@
                             <TextBlock Text="NEW PASSWORD" Classes="label"/>
                             <DockPanel Margin="0,0,0,14">
                                 <Button x:Name="SetPasswordButton" DockPanel.Dock="Right" Classes="chip" Content="SET PASSWORD" Margin="8,0,0,0"/>
-                                <Button x:Name="ShowPassButton" DockPanel.Dock="Right" Classes="chip" Content="SHOW" Margin="8,0,0,0"/>
+                                <Button x:Name="ShowPassButton" DockPanel.Dock="Right" Classes="chip" Margin="8,0,0,0" Padding="12,8">
+                                    <ToolTip.Tip>Show or hide the password</ToolTip.Tip>
+                                    <Viewbox Width="20" Height="20">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Stroke="{DynamicResource Fg}" StrokeThickness="2" StrokeJoin="Round"
+                                                  Data="M1,12 C3,7 7.5,5 12,5 C16.5,5 21,7 23,12 C21,17 16.5,19 12,19 C7.5,19 3,17 1,12 Z M9,12 A3,3 0 1 0 15,12 A3,3 0 1 0 9,12 Z"/>
+                                            <Path x:Name="EyeSlash" IsVisible="False" Stroke="{DynamicResource Fg}" StrokeThickness="2"
+                                                  StrokeLineCap="Round" Data="M4,20 L20,4"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Button>
                                 <TextBox x:Name="DetailPass" PasswordChar="&#x25CF;"/>
                             </DockPanel>
 

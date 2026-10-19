@@ -65,8 +65,35 @@ public static class SessionStore
         catch { }
     }
 
+    // Passwords an admin set for people, so they can be shown again later: a file only this user account can read.
+    static string KnownPath => Path.Combine(Dir, "known.json");
+
+    public static Dictionary<string, string> LoadKnown()
+    {
+        try
+        {
+            if (!File.Exists(KnownPath)) return new();
+            return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(KnownPath)) ?? new();
+        }
+        catch { return new(); }
+    }
+
+    public static void SaveKnown(Dictionary<string, string> known)
+    {
+        try
+        {
+            Directory.CreateDirectory(Dir);
+            var tmp = KnownPath + ".tmp";
+            File.WriteAllText(tmp, System.Text.Json.JsonSerializer.Serialize(known));
+            Private(tmp);
+            File.Move(tmp, KnownPath, true);
+        }
+        catch { }
+    }
+
     public static void Clear()
     {
         try { File.Delete(FilePath); } catch { }
+        try { File.Delete(KnownPath); } catch { }
     }
 }

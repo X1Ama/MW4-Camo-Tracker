@@ -204,6 +204,7 @@ public partial class AdminPanel : UserControl
         CreateButton.IsEnabled = false;
         await RunAsync(() => api.CreateUserAsync(user, pass, name, role), $"Created. User name: {user}   Password: {pass}");
         knownPass[user] = pass;
+        SessionStore.SaveKnown(knownPass);
         if (MessageText.Foreground == (Brush)Application.Current.Resources["Accent"])
         {
             NewUser.Text = ""; NewPass.Text = ""; NewName.Text = "";
@@ -219,14 +220,14 @@ public partial class AdminPanel : UserControl
     }
 
     // passwords cannot be read back from the server, so this keeps the ones set in this session to show them again
-    readonly Dictionary<string, string> knownPass = new();
+    readonly Dictionary<string, string> knownPass = SessionStore.LoadKnown();
 
     void ShowPass_Click(object sender, RoutedEventArgs e)
     {
         bool show = DetailPass.Visibility != Visibility.Visible;
         DetailPass.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         DetailPassHidden.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
-        ShowPassButton.Content = show ? "HIDE" : "SHOW";
+        EyeSlash.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
     }
 
     void DetailPassHidden_Changed(object sender, RoutedEventArgs e)
@@ -247,6 +248,7 @@ public partial class AdminPanel : UserControl
         var id = selected.Id;
         var userName = selected.UserName;
         knownPass[userName] = pass;
+        SessionStore.SaveKnown(knownPass);
         await RunAsync(() => api.SetPasswordAsync(id, pass), $"Password set for {userName}. Press SHOW to see it.");
     }
 

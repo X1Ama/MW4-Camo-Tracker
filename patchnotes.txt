@@ -1,3 +1,5 @@
+- Admin panel: the password box has an eye button to show or hide it, and passwords you set are remembered on this PC
+- Tidier row of filters, search and SAVE / RESTORE / RESET TAB buttons
 - Admin panel: the password is hidden, press SHOW to see it
 - Fixed the progress percentage being hidden by the new buttons
 - Smoother rounded edges on buttons

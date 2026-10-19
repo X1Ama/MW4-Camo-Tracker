@@ -49,8 +49,35 @@ public static class SessionStore
         catch { }
     }
 
+    // Passwords an admin set for people, so they can be shown again later. Same protection as the sign-in token:
+    // encrypted with the Windows account of this user, deleted when signing out.
+    static string KnownPath => Path.Combine(Path.GetDirectoryName(FilePath)!, "known.dat");
+
+    public static Dictionary<string, string> LoadKnown()
+    {
+        try
+        {
+            if (!File.Exists(KnownPath)) return new();
+            var plain = ProtectedData.Unprotect(File.ReadAllBytes(KnownPath), null, DataProtectionScope.CurrentUser);
+            return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(plain) ?? new();
+        }
+        catch { return new(); }
+    }
+
+    public static void SaveKnown(Dictionary<string, string> known)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(KnownPath)!);
+            var sealedBytes = ProtectedData.Protect(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(known), null, DataProtectionScope.CurrentUser);
+            File.WriteAllBytes(KnownPath, sealedBytes);
+        }
+        catch { }
+    }
+
     public static void Clear()
     {
         try { File.Delete(FilePath); } catch { }
+        try { File.Delete(KnownPath); } catch { }
     }
 }

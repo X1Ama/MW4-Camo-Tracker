@@ -10,7 +10,7 @@
     <RootNamespace>MasteryTracker</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.1.21</Version>
+    <Version>0.1.22</Version>
     <!-- keep only the English WPF resources (drops about a dozen language packs) -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <!-- one fewer background GC thread and less memory held back -->

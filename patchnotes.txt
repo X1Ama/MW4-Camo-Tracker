@@ -1,3 +1,6 @@
+- Admin panel: the password is hidden, press SHOW to see it
+- Fixed the progress percentage being hidden by the new buttons
+- Smoother rounded edges on buttons
 - SAVE and RESTORE buttons: SAVE writes your progress to a file in Documents\MW4 Camo Tracker\Backups, RESTORE puts the last saved copy back
 - RESET TAB now saves a safety copy first, so an accidental reset can be restored
 - Admin panel: after setting a password you can see the user name and password (kept until the app is closed)

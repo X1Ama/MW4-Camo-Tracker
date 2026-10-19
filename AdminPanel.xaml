@@ -118,7 +118,12 @@
                             <DockPanel Margin="0,0,0,14">
                                 <Button DockPanel.Dock="Right" Style="{StaticResource Chip}" Content="SET PASSWORD" Margin="8,0,0,0"
                                         Click="SetPassword_Click"/>
-                                <TextBox x:Name="DetailPass"/>
+                                <Button DockPanel.Dock="Right" x:Name="ShowPassButton" Style="{StaticResource Chip}" Content="SHOW" Margin="8,0,0,0"
+                                        Click="ShowPass_Click"/>
+                                <Grid>
+                                    <PasswordBox x:Name="DetailPassHidden" PasswordChanged="DetailPassHidden_Changed"/>
+                                    <TextBox x:Name="DetailPass" Visibility="Collapsed" TextChanged="DetailPass_Changed"/>
+                                </Grid>
                             </DockPanel>
 
                             <StackPanel x:Name="RoleRow">

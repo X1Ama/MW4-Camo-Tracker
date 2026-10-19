@@ -50,6 +50,12 @@ public partial class AdminPanel : UserControl
         CreateButton.Click += Create_Click;
         SaveNameButton.Click += SaveName_Click;
         SetPasswordButton.Click += SetPassword_Click;
+        ShowPassButton.Click += (_, _) =>
+        {
+            bool hidden = DetailPass.PasswordChar != default(char);
+            DetailPass.PasswordChar = hidden ? default(char) : (char)0x25CF;
+            ShowPassButton.Content = hidden ? "HIDE" : "SHOW";
+        };
         SetRoleButton.Click += SetRole_Click;
         DeleteButton.Click += Delete_Click;
         PeopleBackButton.Click += (_, _) =>
@@ -326,7 +332,7 @@ public partial class AdminPanel : UserControl
         var id = selected.Id;
         var userName = selected.UserName;
         knownPass[userName] = pass;
-        await RunAsync(() => api.SetPasswordAsync(id, pass), $"Password set. User name: {userName}   Password: {pass}");
+        await RunAsync(() => api.SetPasswordAsync(id, pass), $"Password set for {userName}. Press SHOW to see it.");
     }
 
     async void SetRole_Click(object? sender, RoutedEventArgs e)

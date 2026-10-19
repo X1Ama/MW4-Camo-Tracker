@@ -11,8 +11,8 @@
     <RootNamespace>MasteryTracker.Android</RootNamespace>
     <ApplicationId>com.x1ama.mw4camotracker</ApplicationId>
     <ApplicationVersion>1</ApplicationVersion>
-    <ApplicationDisplayVersion>0.1.20</ApplicationDisplayVersion>
-    <Version>0.1.20</Version>
+    <ApplicationDisplayVersion>0.1.21</ApplicationDisplayVersion>
+    <Version>0.1.21</Version>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>

@@ -221,6 +221,24 @@ public partial class AdminPanel : UserControl
     // passwords cannot be read back from the server, so this keeps the ones set in this session to show them again
     readonly Dictionary<string, string> knownPass = new();
 
+    void ShowPass_Click(object sender, RoutedEventArgs e)
+    {
+        bool show = DetailPass.Visibility != Visibility.Visible;
+        DetailPass.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        DetailPassHidden.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+        ShowPassButton.Content = show ? "HIDE" : "SHOW";
+    }
+
+    void DetailPassHidden_Changed(object sender, RoutedEventArgs e)
+    {
+        if (DetailPass.Text != DetailPassHidden.Password) DetailPass.Text = DetailPassHidden.Password;
+    }
+
+    void DetailPass_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (DetailPassHidden.Password != DetailPass.Text) DetailPassHidden.Password = DetailPass.Text;
+    }
+
     async void SetPassword_Click(object sender, RoutedEventArgs e)
     {
         if (selected == null) return;
@@ -229,7 +247,7 @@ public partial class AdminPanel : UserControl
         var id = selected.Id;
         var userName = selected.UserName;
         knownPass[userName] = pass;
-        await RunAsync(() => api.SetPasswordAsync(id, pass), $"Password set. User name: {userName}   Password: {pass}");
+        await RunAsync(() => api.SetPasswordAsync(id, pass), $"Password set for {userName}. Press SHOW to see it.");
     }
 
     async void SetRole_Click(object sender, RoutedEventArgs e)

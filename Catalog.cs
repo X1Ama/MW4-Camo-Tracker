@@ -56,12 +56,62 @@ public static class Catalog
     // Empty class means the type is not known yet; staff can set it in the app.
     public static readonly (string Name, string Cls)[] Weapons =
     {
-        ("Han 86", "ar"), ("KG-7 Vulcan", "sn"), ("Rezi 12", "sg"), ("Finn LMG", "lmg"),
-        ("Mar-9", "mm"), ("Krait P68", "pi"), ("Combat Knife", "me"),
-        ("Pila", ""), ("ISO Nightshade", ""), ("Type 73", ""), ("M4", ""), ("PPSH-41", ""),
-        ("Oris 8.6", ""), ("Hyeon Burst", ""), ("Kastov 762", ""), (".50 GS", ""),
-        ("Patriot XMR", ""), ("X-58 NYX", ""), ("Signal 50", ""),
+        // assault rifles
+        ("Hyeon Burst", "ar"), ("Kastov 762", "ar"), ("Axion", "ar"), ("Han 86", "ar"),
+        ("M4", "ar"), ("Patriot XMR", "ar"), ("Cronen Squall", "ar"), ("Oden", "ar"),
+        // SMGs
+        ("Vel 46", "smg"), ("PPSH-41", "smg"), ("X-58 NYX", "smg"), ("WZ.55 Striga", "smg"), ("ISO Nightshade", "smg"),
+        // shotguns
+        ("Rezi 12", "sg"), ("Warlord", "sg"),
+        // LMGs
+        ("APOC-338", "lmg"), ("Finn LMG", "lmg"), ("Type 73", "lmg"),
+        // marksman rifles
+        ("Mosin-Nagant", "mm"), ("Mar-9", "mm"), ("Oris 8.6", "mm"),
+        // sniper rifles
+        ("Astaroth .57", "sn"), ("Signal 50", "sn"), ("KG-7 Vulcan", "sn"),
+        // pistols
+        (".50 GS", "pi"), ("Sang 9mm", "pi"), ("Mojave .357", "pi"), ("Krait P68", "pi"),
+        // launchers
+        ("Pila", "la"), ("RPG-8", "la"), ("JOKR", "la"), ("PM-40 Anvil", "la"),
+        // melee
+        ("Combat Knife", "me"), ("FSS Carbon Edge 1095", "me"),
     };
+    /// <summary>The DMZ completionist camos, shown as their own group on the DMZ tab.</summary>
+    public static readonly string[] DmzCompletionist = { "Gold", "Platinum", "Harmonic Break", "Divergence" };
+
+    /// <summary>
+    /// The DMZ special camos differ per gun (keyed by the weapon's slug, see Slug). Shown as a group above the
+    /// completionist camos on the DMZ tab. A gun that is not listed has no special camos yet.
+    /// </summary>
+    static readonly Dictionary<string, string[]> DmzSpecialByGun = new()
+    {
+        ["han-86"] = new[] { "Smoke", "Stormwave", "Red" },
+        ["kastov-762"] = new[] { "Samnim", "Raster Aux", "Yellow" },
+    };
+
+    /// <summary>What it takes to unlock a camo, shown when hovering its tile. Null when we do not know it.</summary>
+    public static string? Challenge(string camo, string cls, string gunName) => camo switch
+    {
+        "Mercurial Drift" => "Get 10 Kills in a match 250 times",
+        "Polyatomic Reforged" => "Get 3 Kills without taking Damage 300 times",
+        "Orion Reforged" => "Get 5 Kills without dying 500 times",
+        "Chiral" => "Get 2500 Tier 3+ enemy kills",
+        "Ripple Tide" => "Exfil 2 LT dog tags in a single deployment 50 times",
+        "Helio" => "Get 25000 Kills using a Legendary Weapon on a Max Level Operator",
+        "Gold" => "Get 100 Enemy Kills in a single match in DMZ",
+        "Platinum" => "Get 100 Headshots against Enemies",
+        "Harmonic Break" => "Get 50 Double Kills against Enemies",
+        "Divergence" => "Complete 33 Harmonic Break Camo Challenges",
+        "Smoke" => "Get 75 Kills while Mounted against Enemies",
+        "Stormwave" => "Get 125 Enemy Kills while using a silencer",
+        "Red" => "Get 3 Enemy Kills without taking damage 50 times",
+        "Samnim" => "Get 5 Enemy Kills without taking damage 25 times",
+        "Raster Aux" => "Get 75 Enemy Longshot Kills",
+        "Yellow" => "Get 100 Enemy Hipfire Kills",
+        _ => null,
+    };
+    public static string[] DmzSpecialFor(string weaponKey) =>
+        DmzSpecialByGun.TryGetValue(weaponKey, out var list) ? list : Array.Empty<string>();
 
     public static readonly Mode[] Modes =
     {
@@ -69,6 +119,8 @@ public static class Catalog
         new("wz",  "Warzone",     true,  new[] { "Parallax", "Damascus Reforged", "Empyros" }),
         new("dmz", "DMZ",         true,  new[] { "Chiral", "Ripple Tide", "Helio" }),
         new("pr",  "Prestige",    false, new[] { "Pyroclast", "Pyroclast Verge", "Pyroclast Scatter" }),
+        // the mode mastery camos of Multiplayer and DMZ together (ticks are shared with those tabs)
+        new("mm",  "Mode Mastery", false, Array.Empty<string>()),
     };
 
     public static string Slug(string s)

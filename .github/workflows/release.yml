@@ -2,8 +2,9 @@
 #   git tag v0.2.0
 #   git push origin v0.2.0
 #
-# Windows (the WPF app in the repository root) is the main release. Linux and macOS builds (the Avalonia app in
-# cross/) are added to the same release when they succeed; if one of them fails, Windows still ships.
+# Only the Windows app (the WPF app in the repository root) is released for now.
+# The Linux, macOS and Android builds (the Avalonia app in cross/) are paused: the code is still in cross/, and the
+# jobs can be brought back from the git history (see the commit that paused them).
 # To force everyone to update, edit update.json on the release and set "required": true.
 name: Release
 
@@ -42,133 +43,8 @@ jobs:
           name: build-windows
           path: out/MasteryCamoTracker.exe
 
-  linux:
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
-      - name: Build both Linux flavours
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          sed -i "s|<Version>[^<]*</Version>|<Version>$VERSION</Version>|" cross/Desktop/MasteryTracker.Cross.csproj cross/Core/MasteryTracker.Core.csproj
-          mkdir -p dist
-          for rid in linux-x64 linux-arm64; do
-            dotnet publish cross/Desktop/MasteryTracker.Cross.csproj -c Release -r $rid -o out/$rid
-            # the file the in-app updater downloads
-            cp out/$rid/MasteryCamoTracker dist/MasteryCamoTracker-$rid
-            # the download for a first install (keeps the "executable" flag)
-            chmod +x out/$rid/MasteryCamoTracker
-            tar -C out/$rid -czf dist/MW4-Camo-Tracker-$rid.tar.gz MasteryCamoTracker
-          done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: build-linux
-          path: dist/*
-
-  android:
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-      - name: Build the Android app
-        env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: |
-          exec > >(tee build.log) 2>&1
-          VERSION="${GITHUB_REF_NAME#v}"
-          sed -i "s|<Version>[^<]*</Version>|<Version>$VERSION</Version>|" cross/Core/MasteryTracker.Core.csproj
-          sed -i "s|<Version>[^<]*</Version>|<Version>$VERSION</Version>|; s|<ApplicationDisplayVersion>[^<]*</ApplicationDisplayVersion>|<ApplicationDisplayVersion>$VERSION</ApplicationDisplayVersion>|" cross/Android/MasteryTracker.Android.csproj
-          # the GitHub machine has newer .NET versions too; cross/Android/global.json makes this folder use .NET 8
-          cd cross/Android
-          dotnet --version
-          dotnet workload install android
-          SIGN=""
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/mw4.keystore"
-            SIGN="-p:AndroidKeyStore=true -p:AndroidSigningKeyStore=$RUNNER_TEMP/mw4.keystore -p:AndroidSigningStorePass=env:KEYSTORE_PASSWORD -p:AndroidSigningKeyAlias=mw4 -p:AndroidSigningKeyPass=env:KEYSTORE_PASSWORD"
-          else
-            echo "No signing key set up: building with a throw-away key (updates will not install over earlier builds)."
-          fi
-          # a number that grows with every release (Android refuses to install an older number over a newer one)
-          dotnet publish MasteryTracker.Android.csproj -c Release -f net8.0-android \
-            -p:AndroidPackageFormat=apk -p:ApplicationVersion=$GITHUB_RUN_NUMBER $SIGN
-          mkdir -p "$GITHUB_WORKSPACE/dist"
-          apk=$(find bin -name "*-Signed.apk" | head -n 1)
-          cp "$apk" "$GITHUB_WORKSPACE/dist/MW4-Camo-Tracker.apk"
-          ls -la "$GITHUB_WORKSPACE/dist"
-      - name: Show why the Android build failed
-        if: failure()
-        run: echo "::error::$(tail -n 30 build.log | tr '\n' '|')"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: build-android
-          path: dist/*
-  macos:
-    runs-on: macos-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
-      - name: Build both Mac flavours
-        run: |
-          exec > >(tee build.log) 2>&1
-          VERSION="${GITHUB_REF_NAME#v}"
-          sed -i '' "s|<Version>[^<]*</Version>|<Version>$VERSION</Version>|" cross/Desktop/MasteryTracker.Cross.csproj cross/Core/MasteryTracker.Core.csproj
-          mkdir -p dist
-
-          # one icon file from the 1024 px picture
-          mkdir -p app.iconset
-          for s in 16 32 128 256 512; do
-            sips -z $s $s cross/packaging/app-1024.png --out app.iconset/icon_${s}x${s}.png >/dev/null
-            sips -z $((s*2)) $((s*2)) cross/packaging/app-1024.png --out app.iconset/icon_${s}x${s}@2x.png >/dev/null
-          done
-          iconutil -c icns app.iconset -o app.icns
-
-          for rid in osx-arm64 osx-x64; do
-            dotnet publish cross/Desktop/MasteryTracker.Cross.csproj -c Release -r $rid -o out/$rid
-            chmod +x out/$rid/MasteryCamoTracker
-            # ad-hoc signature: Apple Silicon refuses to start programs that carry none
-            codesign --force -s - out/$rid/MasteryCamoTracker
-            for lib in out/$rid/*.dylib; do [ -e "$lib" ] || continue; codesign --force -s - "$lib"; done
-
-            # the file the in-app updater downloads: the program and its libraries
-            (cd out/$rid && zip -qr "../../dist/MasteryCamoTracker-$rid.zip" .)
-
-            # the .app for a first install
-            app="MW4 Camo Tracker.app"
-            rm -rf "$app"
-            mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-            cp -R out/$rid/. "$app/Contents/MacOS/"
-            cp app.icns "$app/Contents/Resources/app.icns"
-            sed "s|__VERSION__|$VERSION|g" cross/packaging/Info.plist > "$app/Contents/Info.plist"
-            codesign --force --deep -s - "$app"
-            ditto -c -k --keepParent "$app" "dist/MW4-Camo-Tracker-macOS-$rid.zip"
-          done
-      - name: Show why the Mac build failed
-        if: failure()
-        run: echo "::error::$(tail -n 30 build.log | tr '\n' '|')"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: build-macos
-          path: dist/*
-
   release:
-    needs: [windows, linux, macos, android]
-    if: ${{ always() && needs.windows.result == 'success' }}
+    needs: [windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -187,15 +63,7 @@ jobs:
           if [ -f patchnotes.txt ]; then
             notes=$(grep -E '^\s*[-*]\s+\S' patchnotes.txt | sed -E 's/^\s*[-*]\s+//; s/\r$//' | jq -R . | jq -s .)
           fi
-          # a download is only advertised when it was really built
           assets='{}'
-          for rid in linux-x64 linux-arm64; do
-            [ -f "artifacts/MasteryCamoTracker-$rid" ] && assets=$(echo "$assets" | jq --arg k "$rid" --arg v "$BASE/MasteryCamoTracker-$rid" '. + {($k): $v}')
-          done
-          for rid in osx-arm64 osx-x64; do
-            [ -f "artifacts/MasteryCamoTracker-$rid.zip" ] && assets=$(echo "$assets" | jq --arg k "$rid" --arg v "$BASE/MasteryCamoTracker-$rid.zip" '. + {($k): $v}')
-          done
-          [ -f "artifacts/MW4-Camo-Tracker.apk" ] && assets=$(echo "$assets" | jq --arg v "$BASE/MW4-Camo-Tracker.apk" '. + {android: $v}')
           jq -n --arg version "$VERSION" --arg url "$BASE/MasteryCamoTracker.exe" \
                 --argjson notes "$notes" --argjson assets "$assets" \
                 '{version: $version, url: $url, notes: $notes, required: false, assets: $assets}' > artifacts/update.json

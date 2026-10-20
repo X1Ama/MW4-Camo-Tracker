@@ -64,43 +64,9 @@ Run `supabase-admin.sql` once in the SQL Editor, after `supabase.sql`. Then owne
 
 Creating users from the panel replaces the dashboard steps above. The first owner still has to be made in the dashboard with the SQL line in step 5.
 
-## Linux and macOS
+## Linux, macOS and Android (paused)
 
-The `cross/` folder holds a second version of the app built on [Avalonia](https://avaloniaui.net), with the same
-screens, sign-in, live sync, admin panel, settings and updates. It shares the server code with the Windows app
-(`Api.cs`, `RealtimeClient.cs`, `Catalog.cs`). Tag a release and GitHub builds all of these:
-
-| System | Download | Notes |
-|---|---|---|
-| Linux x64 / arm64 | `MW4-Camo-Tracker-linux-x64.tar.gz` | Unpack, then run `./MasteryCamoTracker`. It adds itself to the applications menu on first start. |
-| macOS (Apple Silicon) | `MW4-Camo-Tracker-macOS-osx-arm64.zip` | Unzip and drag `MW4 Camo Tracker.app` to Applications. |
-| macOS (Intel) | `MW4-Camo-Tracker-macOS-osx-x64.zip` | Same as above. |
-
-The macOS app is not signed with an Apple Developer account, so the first time macOS says it cannot verify the
-developer: right-click the app, choose **Open**, then **Open** again. (Or run `xattr -dr com.apple.quarantine "/Applications/MW4 Camo Tracker.app"`.)
-
-Linux needs a normal desktop with X11 or Wayland and the usual font libraries (`libfontconfig`). The tray icon needs a
-desktop that shows tray icons (KDE, XFCE, Cinnamon and GNOME with the AppIndicator extension do).
-
-What differs from the Windows app: "Remember me" keeps the sign-in token in a file only your user account can read
-(like an SSH key) instead of Windows' own encryption, the chime plays through `paplay` / `pw-play` / `aplay` on Linux
-and `afplay` on macOS, and "launch when I sign in" uses an autostart entry (Linux) or a LaunchAgent (macOS).
-
-To build one yourself: `dotnet publish cross/MasteryTracker.Cross.csproj -c Release -r linux-x64` (or `osx-arm64`,
-`osx-x64`, `win-x64`). It also runs on Windows, which is handy for trying the screens: `dotnet run --project cross -- --demo`.
-
-## Android
-
-The same Avalonia app also builds for Android (`cross/Android`), sharing every screen with the desktop version
-through `cross/Core`. On a phone it shows one column of cards, the client list in a slide-out menu, and bigger tap targets.
-
-- **Install:** download `MW4-Camo-Tracker.apk` from the latest release on your phone and open it. Android asks once to allow
-  installs from your browser or Files app.
-- **Updates:** the app checks for new versions like the other versions do. Tapping UPDATE NOW downloads the new `.apk` and
-  opens Android's installer, which asks you to confirm.
-- **Signing:** every release is signed with the same key (GitHub secrets `ANDROID_KEYSTORE_B64` and
-  `ANDROID_KEYSTORE_PASSWORD`), which is what lets a new version install over the old one. Keep a copy of that key; if it is
-  lost, everyone has to uninstall and reinstall once. Without the secrets the workflow still builds, using a throw-away key.
-- **Build it yourself:** needs the .NET 8 SDK with the `android` workload and a JDK 17:
-  `dotnet publish cross/Android/MasteryTracker.Android.csproj -c Release -f net8.0-android -p:AndroidPackageFormat=apk`
-- To preview the phone layout on a computer: `dotnet run --project cross/Desktop -- --demo --phone`.
+The Linux, macOS and Android versions are on hold for now, so releases only contain the Windows app. The code is still in
+the `cross/` folder (an [Avalonia](https://avaloniaui.net) app with a desktop head and an Android head), but GitHub no longer
+builds or publishes it. To bring it back, restore the `linux`, `macos` and `android` jobs in `.github/workflows/release.yml`
+(they are in the git history before the commit that paused them).

@@ -51,6 +51,7 @@ public partial class MainWindow : Window
     {
         TitleBar.Apply(this);
         InitializeComponent();
+        TrackerPanel.SizeChanged += (_, e) => { if (e.WidthChanged) FitCards(); };
         BuildTabs();
         BuildFilters();
 
@@ -946,7 +947,19 @@ public partial class MainWindow : Window
     List<(string Id, string Label, bool Track)> ChipsFor(Row w, Mode mode)
     {
         var chips = new List<(string Id, string Label, bool Track)>();
+        if (mode.Id == "dmz")      // the DMZ tab holds the special and the completionist camos
+        {
+            foreach (var c in Catalog.DmzSpecialFor(w.Key)) chips.Add(($"dmzs-{w.Key}-{Catalog.Slug(c)}", c, false));
+            foreach (var c in Catalog.DmzCompletionist) chips.Add(($"dmzc-{w.Key}-{Catalog.Slug(c)}", c, false));
+            return chips;
+        }
         if (mode.Track) chips.Add(("track-" + w.Key, "Camo Track", true));
+        if (mode.Id == "mm")
+        {
+            foreach (var src in Catalog.Modes.Where(m => m.Id is "mp" or "dmz"))
+                foreach (var c in src.Camos) chips.Add(($"{src.Id}-{w.Key}-{Catalog.Slug(c)}", c, false));
+            return chips;
+        }
         foreach (var c in mode.Camos) chips.Add(($"{mode.Id}-{w.Key}-{Catalog.Slug(c)}", c, false));
         return chips;
     }
@@ -1007,7 +1020,6 @@ public partial class MainWindow : Window
         var ids = Rows().SelectMany(w => ChipsFor(w, mode)).Select(c => c.Id)
             .Where(id => data.Ticks.Contains(id)).Distinct().ToList();
         var levels = data.Levels.Where(kv => kv.Value > 0).ToList();
-        if (ids.Count == 0 && levels.Count == 0) { SetStatus($"Nothing to reset in {mode.Name} yet.", true); return; }
 
         if (resetConfirm == null)
         {
@@ -1018,7 +1030,7 @@ public partial class MainWindow : Window
         }
         var who = target.Id == me.Id ? "your progress" : target.Label + "'s progress";
         var body = $"This clears {ids.Count} ticked camo{(ids.Count == 1 ? "" : "s")} in the {mode.Name} tab and sets every weapon level back to 0 ({who}). This cannot be undone."
-            + (mode.Track ? " Camo Track and weapon levels are shared with the other tabs." : " Weapon levels are shared with the other tabs.");
+            + (mode.Track && mode.Id != "dmz" ? " Camo Track and weapon levels are shared with the other tabs." : " Weapon levels are shared with the other tabs.");
         if (!await resetConfirm.AskAsync($"Reset {mode.Name}?", body, "RESET")) return;
 
         var cid = target.Id;
@@ -1167,13 +1179,60 @@ public partial class MainWindow : Window
             Margin = new Thickness(0, 28, 0, 4),
         });
 
+        FitCards();
         int pct = total == 0 ? 0 : (int)Math.Round(done * 100.0 / total);
         Progress.Value = pct;
         ProgressText.Text = $"{done} / {total}  \u00B7  {pct}%";
     }
 
-    static string Initials(string label) =>
-        string.Concat(label.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(p => char.ToUpperInvariant(p[0])));
+    /// <summary>Spreads the weapon cards over the full width: as many columns as fit, each card the same width.</summary>
+    static UIElement TipContent(string name, string? challenge)
+    {
+        var panel = new StackPanel { MaxWidth = 280 };
+        panel.Children.Add(new TextBlock { Text = name, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Center });
+        if (!string.IsNullOrEmpty(challenge))
+            panel.Children.Add(new TextBlock { Text = challenge, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 3, 0, 0) });
+        return panel;
+    }
+
+    /// <summary>A tooltip that appears centred under the tile instead of at its left edge.</summary>
+    static ToolTip CenteredTip(string text, string? challenge = null) => new()
+    {
+        Content = TipContent(text, challenge),
+        Placement = System.Windows.Controls.Primitives.PlacementMode.Custom,
+        CustomPopupPlacementCallback = (popup, target, _) => new[]
+        {
+            new System.Windows.Controls.Primitives.CustomPopupPlacement(
+                new Point((target.Width - popup.Width) / 2, target.Height + 4),
+                System.Windows.Controls.Primitives.PopupPrimaryAxis.Horizontal),
+        },
+    };
+
+    double cardW = 270;
+
+    void FitCards()
+    {
+        double avail = TrackerPanel.ActualWidth - 12;
+        if (avail < 100) return;
+        int cols = Math.Max(1, (int)(avail / 250));
+        double w = Math.Floor(avail / cols) - 10;
+        cardW = w;
+        foreach (var wrap in TrackerPanel.Children.OfType<WrapPanel>())
+            foreach (var c in wrap.Children.OfType<FrameworkElement>())
+                c.Width = w;
+    }
+
+    static string Initials(string label) => label switch
+    {
+        "Smoke" => "SM",            // Smoke and Stormwave would both be "S"
+        "Stormwave" => "SW",
+        _ => string.Concat(label.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(p => char.ToUpperInvariant(p[0]))),
+    };
+
+    /// <summary>The Mode Mastery tab shows its camos in small groups per mode; every other tab is one group.</summary>
+    IEnumerable<IGrouping<string, (string Id, string Label, bool Track)>> ChipGroups(List<(string Id, string Label, bool Track)> chips) =>
+        chips.GroupBy(c => modeId == "dmz" ? (c.Id.StartsWith("dmzs-") ? "SPECIAL" : "COMPLETIONIST")
+            : modeId != "mm" ? "" : c.Id.StartsWith("dmz-") ? "DMZ" : c.Id.StartsWith("mp-") ? "MULTIPLAYER" : "");
 
     /// <summary>One weapon as a card: its name and level on top, a strip of camo tiles underneath.</summary>
     UIElement BuildRow(Row w, List<(string Id, string Label, bool Track)> chips, int d, bool all)
@@ -1212,7 +1271,14 @@ public partial class MainWindow : Window
                 () => api.RemoveCustomAsync(id));
             title.Children.Add(rm);
         }
-        body.Children.Add(title);
+        body.Children.Add(new Border
+        {
+            Background = Res("Panel2"),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(0, 9, 0, 9),
+            Margin = new Thickness(-4, -2, -4, 6),
+            Child = title,
+        });
         body.Children.Add(new TextBlock
         {
             Text = $"{d}/{chips.Count} camos",
@@ -1262,8 +1328,12 @@ public partial class MainWindow : Window
         body.Children.Add(BuildLevel(w));
 
         // the camo tiles: initials on a square, yellow when ticked, full name on hover
-        var strip = new System.Windows.Controls.Primitives.UniformGrid { Rows = 1, Margin = new Thickness(0, 12, 0, 0) };
-        foreach (var c in chips)
+        foreach (var grp in ChipGroups(chips))
+        {
+        if (grp.Key.Length > 0)
+            body.Children.Add(new TextBlock { Text = grp.Key, FontFamily = DisplayFont, FontSize = 14, Foreground = new SolidColorBrush(Color.FromRgb(0xB4, 0xBB, 0xC0)), Margin = new Thickness(2, 12, 0, 0) });
+        var strip = new System.Windows.Controls.Primitives.UniformGrid { Rows = 1, Margin = new Thickness(0, grp.Key.Length > 0 ? 4 : 12, 0, 0) };
+        foreach (var c in grp)
         {
             bool on = data.Ticks.Contains(c.Id);
             var b = new Button
@@ -1283,7 +1353,7 @@ public partial class MainWindow : Window
                 Background = on ? Res("Accent") : Res("Panel2"),
                 Foreground = on ? Res("AccentFg") : Res("Fg"),
                 BorderBrush = on ? Res("Accent") : Res("Line"),
-                ToolTip = c.Label,
+                ToolTip = CenteredTip(c.Label, Catalog.Challenge(c.Label, w.Cls, w.Name)),
                 IsHitTestVisible = CanEdit,
             };
             var cid = c.Id;
@@ -1299,9 +1369,10 @@ public partial class MainWindow : Window
             strip.Children.Add(b);
         }
         body.Children.Add(strip);
+        }
 
         var card = Panel(body, all ? Res("Accent") : null);
-        card.Width = 270;
+        card.Width = cardW;
         card.Margin = new Thickness(0, 10, 10, 0);
         return card;
     }

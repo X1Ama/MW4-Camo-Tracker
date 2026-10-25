@@ -2,9 +2,9 @@
 #   git tag v0.2.0
 #   git push origin v0.2.0
 #
-# Only the Windows app (the WPF app in the repository root) is released for now.
-# The Linux, macOS and Android builds (the Avalonia app in cross/) are paused: the code is still in cross/, and the
-# jobs can be brought back from the git history (see the commit that paused them).
+# The Windows app (the WPF app in the repository root) is the main release. The Android app (the Avalonia app in
+# cross/) is added to the same release when it builds; if it fails, Windows still ships.
+# The Linux and macOS builds are paused (their jobs are in the git history).
 # To force everyone to update, edit update.json on the release and set "required": true.
 name: Release
 
@@ -43,8 +43,56 @@ jobs:
           name: build-windows
           path: out/MasteryCamoTracker.exe
 
+  android:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Build the Android app
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          exec > >(tee build.log) 2>&1
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s|<Version>[^<]*</Version>|<Version>$VERSION</Version>|" cross/Core/MasteryTracker.Core.csproj
+          sed -i "s|<Version>[^<]*</Version>|<Version>$VERSION</Version>|; s|<ApplicationDisplayVersion>[^<]*</ApplicationDisplayVersion>|<ApplicationDisplayVersion>$VERSION</ApplicationDisplayVersion>|" cross/Android/MasteryTracker.Android.csproj
+          # the GitHub machine has newer .NET versions too; cross/Android/global.json makes this folder use .NET 8
+          cd cross/Android
+          dotnet --version
+          dotnet workload install android
+          SIGN=""
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/mw4.keystore"
+            SIGN="-p:AndroidKeyStore=true -p:AndroidSigningKeyStore=$RUNNER_TEMP/mw4.keystore -p:AndroidSigningStorePass=env:KEYSTORE_PASSWORD -p:AndroidSigningKeyAlias=mw4 -p:AndroidSigningKeyPass=env:KEYSTORE_PASSWORD"
+          else
+            echo "No signing key set up: building with a throw-away key (updates will not install over earlier builds)."
+          fi
+          # a number that grows with every release (Android refuses to install an older number over a newer one)
+          dotnet publish MasteryTracker.Android.csproj -c Release -f net8.0-android \
+            -p:AndroidPackageFormat=apk -p:ApplicationVersion=$GITHUB_RUN_NUMBER $SIGN
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          apk=$(find bin -name "*-Signed.apk" | head -n 1)
+          cp "$apk" "$GITHUB_WORKSPACE/dist/MW4-Camo-Tracker.apk"
+          ls -la "$GITHUB_WORKSPACE/dist"
+      - name: Show why the Android build failed
+        if: failure()
+        run: echo "::error::$(tail -n 30 build.log | tr '\n' '|')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-android
+          path: dist/*
+
   release:
-    needs: [windows]
+    needs: [windows, android]
+    if: ${{ always() && needs.windows.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +112,8 @@ jobs:
             notes=$(grep -E '^\s*[-*]\s+\S' patchnotes.txt | sed -E 's/^\s*[-*]\s+//; s/\r$//' | jq -R . | jq -s .)
           fi
           assets='{}'
+          # the Android app is advertised only when it was really built
+          [ -f "artifacts/MW4-Camo-Tracker.apk" ] && assets=$(echo "$assets" | jq --arg v "$BASE/MW4-Camo-Tracker.apk" '. + {android: $v}')
           # a fingerprint of the exe, so the app can check it got exactly this file
           sha=$(sha256sum artifacts/MasteryCamoTracker.exe | cut -d" " -f1)
           jq -n --arg version "$VERSION" --arg url "$BASE/MasteryCamoTracker.exe" --arg sha "$sha" \

@@ -38,9 +38,9 @@ public static class Catalog
         ["rezi-12"] = 59, ["warlord"] = 59,
         ["finn-lmg"] = 58, ["type-73"] = 64, ["apoc-338"] = 55,
         ["mar-9"] = 72, ["oris-8-6"] = 69, ["mosin-nagant"] = 68,
-        ["kg-7-vulcan"] = 74, ["astaroth-57"] = 53, ["signal-50"] = 60,         // Signal 50: placeholder (still locked)
+        ["kg-7-vulcan"] = 74, ["astaroth-57"] = 53, ["signal-50"] = 73,
         ["iso-nightshade"] = 63, ["vel-46"] = 59, ["wz-55-striga"] = 59, ["ppsh-41"] = 61,
-        ["axion"] = 71, ["cronen-squall"] = 71, ["x-58-nyx"] = 52,
+        ["axion"] = 68, ["cronen-squall"] = 66, ["x-58-nyx"] = 52,
     };
 
     public static int MaxLevelFor(string weaponKey) =>
@@ -310,6 +310,25 @@ public static class Catalog
         // the mode mastery camos of Multiplayer and DMZ together (ticks are shared with those tabs)
         new("mm",  "Mode Mastery", false, Array.Empty<string>()),
     };
+
+    /// <summary>
+    /// Ticks saved under an older camo id that now live under another one: the Multiplayer tab of v0.1.24 (mps-/mpc-) is now
+    /// shared with DMZ (dmzs-/dmzc-), and the second Prestige camo was renamed from Verge to Terminus.
+    /// </summary>
+    public static (List<string> Old, List<string> New) OldTickMoves(IEnumerable<string> ticks)
+    {
+        var old = new List<string>(); var neu = new List<string>();
+        foreach (var id in ticks)
+        {
+            string? to = null;
+            if (id.StartsWith("mps-", StringComparison.Ordinal)) to = "dmzs-" + id[4..];
+            else if (id.StartsWith("mpc-", StringComparison.Ordinal)) to = "dmzc-" + id[4..];
+            else if (id.StartsWith("pr-", StringComparison.Ordinal) && id.EndsWith("-pyroclast-verge", StringComparison.Ordinal))
+                to = id[..^"verge".Length] + "terminus";
+            if (to != null) { old.Add(id); neu.Add(to); }
+        }
+        return (old, neu);
+    }
 
     public static string Slug(string s)
     {

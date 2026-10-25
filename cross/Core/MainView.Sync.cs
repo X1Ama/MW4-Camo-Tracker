@@ -49,6 +49,7 @@ public partial class MainView
             try
             {
                 var d = await pre;
+                MoveOldTicks(d, me.Id);
                 data = d;
                 lastSig = d.Signature();
                 lastFullLoad = DateTime.UtcNow;
@@ -231,6 +232,26 @@ public partial class MainView
         });
     }
 
+    /// <summary>Carries ticks saved under an older camo id over to its current id (shown at once, saved in the background).</summary>
+    void MoveOldTicks(ClientData d, string clientId)
+    {
+        var (old, neu) = Catalog.OldTickMoves(d.Ticks);
+        if (old.Count == 0) return;
+        foreach (var o in old) d.Ticks.Remove(o);
+        foreach (var n in neu) d.Ticks.Add(n);
+        if (!CanEdit) return;
+        var server = api;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await server.RestoreAsync(clientId, neu, new Dictionary<string, int>());
+                await server.ResetTicksAsync(clientId, old);
+            }
+            catch { /* shown correctly anyway; it is saved on a later start */ }
+        });
+    }
+
     async Task RefreshAsync(string? only = null)
     {
         var who = target;
@@ -240,6 +261,7 @@ public partial class MainView
             var fresh = new ClientData();
             if (only != null) fresh.CopyFrom(data); // keep the other tables, re-read just this one
             await api.LoadAsync(who.Id, fresh, only);
+            if (only == null || only == "ticks") MoveOldTicks(fresh, who.Id);
             if (inflight > 0 || who.Id != target?.Id) return;
             var sig = fresh.Signature();
             if (only == null) lastFullLoad = DateTime.UtcNow;

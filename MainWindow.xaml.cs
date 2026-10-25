@@ -954,8 +954,8 @@ public partial class MainWindow : Window
         var chips = new List<(string Id, string Label, bool Track)>();
         if (mode.Id is "dmz" or "mp")      // the Multiplayer and DMZ tabs each hold the special and the completionist camos
         {
-            foreach (var c in Catalog.DmzSpecialFor(w.Key)) chips.Add(($"{mode.Id}s-{w.Key}-{Catalog.Slug(c)}", c, false));
-            foreach (var c in Catalog.DmzCompletionist) chips.Add(($"{mode.Id}c-{w.Key}-{Catalog.Slug(c)}", c, false));
+            foreach (var c in Catalog.DmzSpecialFor(w.Key)) chips.Add(($"dmzs-{w.Key}-{Catalog.Slug(c)}", c, false));    // Multiplayer and DMZ share these ticks
+            foreach (var c in Catalog.DmzCompletionist) chips.Add(($"dmzc-{w.Key}-{Catalog.Slug(c)}", c, false));
             return chips;
         }
         if (mode.Track) chips.Add(("track-" + w.Key, "Camo Track", true));
@@ -1331,7 +1331,7 @@ public partial class MainWindow : Window
 
     /// <summary>The Mode Mastery tab shows its camos in small groups per mode; every other tab is one group.</summary>
     IEnumerable<IGrouping<string, (string Id, string Label, bool Track)>> ChipGroups(List<(string Id, string Label, bool Track)> chips) =>
-        chips.GroupBy(c => modeId is "dmz" or "mp" ? (c.Id.StartsWith(modeId + "s-") ? "SPECIAL" : "COMPLETIONIST")
+        chips.GroupBy(c => modeId is "dmz" or "mp" ? (c.Id.StartsWith("dmzs-") ? "SPECIAL" : "COMPLETIONIST")
             : modeId != "mm" ? "" : c.Id.StartsWith("dmz-") ? "DMZ" : c.Id.StartsWith("mp-") ? "MULTIPLAYER" : "");
 
     /// <summary>One weapon as a card: its name and level on top, a strip of camo tiles underneath.</summary>
@@ -1457,10 +1457,9 @@ public partial class MainWindow : Window
                 b.BorderBrush = new SolidColorBrush(hue);
             }
             var cid = c.Id;
-            // special and completionist camos build on each other: ticking one also ticks the ones before it
-            var earlier = cid.StartsWith(modeId + "c-") ? chips.TakeWhile(x => x.Id != cid).Select(x => x.Id).ToList()      // completionist: all the specials and the completionist camos before it
-                                : cid.StartsWith(modeId + "s-") ? grp.TakeWhile(x => x.Id != cid).Select(x => x.Id).ToList()       // special: the specials before it
-                : new List<string>();
+            // a completionist camo also ticks everything before it; a special camo ticks only itself
+            var earlier = cid.StartsWith("dmzc-") ? chips.TakeWhile(x => x.Id != cid).Select(x => x.Id).ToList()      // completionist: all the specials and the completionist camos before it
+                                : new List<string>();
             b.Click += (_, _) =>
             {
                 bool now = !data.Ticks.Contains(cid);
@@ -1514,10 +1513,12 @@ public partial class MainWindow : Window
         {
             Background = Res("Accent"),
             CornerRadius = new CornerRadius(3),
-            HorizontalAlignment = HorizontalAlignment.Left,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
         };
-        track.Children.Add(fill);
-        track.SizeChanged += (_, _) => fill.Width = track.ActualWidth * lv / Catalog.MaxLevelFor(w.Key);
+        int top = Catalog.MaxLevelFor(w.Key);
+        track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(lv, GridUnitType.Star) });
+        track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(0, top - lv), GridUnitType.Star) });
+        track.Children.Add(fill);        // sits in the first column: its width is the level as a share of the bar
         var trackBox = new Border { BorderBrush = Res("Line"), BorderThickness = new Thickness(1), Child = track, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(5), Padding = new Thickness(1) };
         Grid.SetColumn(trackBox, 1);
         g.Children.Add(trackBox);
@@ -1587,7 +1588,8 @@ public partial class MainWindow : Window
                 Math.Clamp((int)Math.Round(e.GetPosition(track).X / Math.Max(1, track.ActualWidth) * Catalog.MaxLevelFor(w.Key)), 0, Catalog.MaxLevelFor(w.Key));
             void Preview(int v)
             {
-                fill.Width = track.ActualWidth * v / Catalog.MaxLevelFor(w.Key);
+                track.ColumnDefinitions[0].Width = new GridLength(v, GridUnitType.Star);
+                track.ColumnDefinitions[1].Width = new GridLength(Math.Max(0, Catalog.MaxLevelFor(w.Key) - v), GridUnitType.Star);
                 input.Text = v.ToString();
             }
             track.MouseLeftButtonDown += (_, e) =>

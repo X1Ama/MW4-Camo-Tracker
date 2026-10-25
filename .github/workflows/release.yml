@@ -64,9 +64,11 @@ jobs:
             notes=$(grep -E '^\s*[-*]\s+\S' patchnotes.txt | sed -E 's/^\s*[-*]\s+//; s/\r$//' | jq -R . | jq -s .)
           fi
           assets='{}'
-          jq -n --arg version "$VERSION" --arg url "$BASE/MasteryCamoTracker.exe" \
+          # a fingerprint of the exe, so the app can check it got exactly this file
+          sha=$(sha256sum artifacts/MasteryCamoTracker.exe | cut -d" " -f1)
+          jq -n --arg version "$VERSION" --arg url "$BASE/MasteryCamoTracker.exe" --arg sha "$sha" \
                 --argjson notes "$notes" --argjson assets "$assets" \
-                '{version: $version, url: $url, notes: $notes, required: false, assets: $assets}' > artifacts/update.json
+                '{version: $version, url: $url, sha256: $sha, notes: $notes, required: false, assets: $assets}' > artifacts/update.json
           cat artifacts/update.json
           ls -la artifacts
 

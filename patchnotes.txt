@@ -1,7 +1,5 @@
-- Special camos for every gun, with their challenges shown when you hover over a camo
-- Multiplayer and DMZ tabs, each with its own special and completionist camos and requirements
-- Camo pictures on the tiles, and a gun card that takes on the colour of its highest completionist camo
-- Ticking a special or completionist camo also ticks the ones before it
-- Guns sorted in the in-game order, each with its own top weapon level
-- New Prestige camos (Pyroclast, Terminus, Scatter, Cascade) and a Mode Mastery tab
-- Fixed the screen sometimes staying on Loading when picking a client
+- Multiplayer and DMZ now share their ticks: unlock a camo in one and it is unlocked in the other
+- Ticking a special camo only ticks that camo
+- Fixed the level bar briefly disappearing when changing tabs
+- Updated top levels for the X-58 Nyx and the APOC-338
+- Safer updates: the app now only accepts update downloads from GitHub and checks the file is the right one

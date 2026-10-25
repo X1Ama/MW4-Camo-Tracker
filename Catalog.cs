@@ -36,11 +36,11 @@ public static class Catalog
         ["sang-9mm"] = 37, ["krait-p68"] = 37, ["50-gs"] = 36, ["mojave-357"] = 37,   // Mojave .357: placeholder (still locked)
         ["pila"] = 46, ["rpg-8"] = 46, ["jokr"] = 46, ["pm-40-anvil"] = 46,          // JOKR, PM-40 Anvil: placeholders (still locked)
         ["rezi-12"] = 59, ["warlord"] = 59,
-        ["finn-lmg"] = 58, ["type-73"] = 64, ["apoc-338"] = 64,                 // APOC-338: placeholder (still locked)
+        ["finn-lmg"] = 58, ["type-73"] = 64, ["apoc-338"] = 55,
         ["mar-9"] = 72, ["oris-8-6"] = 69, ["mosin-nagant"] = 68,
         ["kg-7-vulcan"] = 74, ["astaroth-57"] = 53, ["signal-50"] = 60,         // Signal 50: placeholder (still locked)
         ["iso-nightshade"] = 63, ["vel-46"] = 59, ["wz-55-striga"] = 59, ["ppsh-41"] = 61,
-        ["axion"] = 71, ["cronen-squall"] = 71, ["x-58-nyx"] = 61,      // not seen yet in game (still locked): placeholders
+        ["axion"] = 71, ["cronen-squall"] = 71, ["x-58-nyx"] = 52,
     };
 
     public static int MaxLevelFor(string weaponKey) =>

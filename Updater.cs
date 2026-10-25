@@ -8,7 +8,7 @@ using System.Windows;
 
 namespace MasteryTracker;
 
-public sealed record UpdateInfo(Version Version, string Url, string Notes, bool Required, IReadOnlyList<string> Highlights);
+public sealed record UpdateInfo(Version Version, string Url, string Notes, bool Required, IReadOnlyList<string> Highlights, string? Sha256 = null);
 
 /// <summary>
 /// Checks a small update.json file (hosted anywhere over HTTPS, for example a GitHub Release asset),
@@ -67,7 +67,8 @@ public static class Updater
             var r = d.RootElement;
             var version = Normalize(Version.Parse(r.GetProperty("version").GetString()!));
             var url = r.GetProperty("url").GetString() ?? "";
-            if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return null;
+            if (!IsTrustedDownload(url)) return null;
+            var sha = r.TryGetProperty("sha256", out var shaProp) && shaProp.ValueKind == JsonValueKind.String ? shaProp.GetString()?.Trim().ToLowerInvariant() : null;
             var highlights = new List<string>();
             var notes = "";
             if (r.TryGetProperty("notes", out var n))
@@ -92,12 +93,28 @@ public static class Updater
             }
             if (notes.Length == 0) notes = string.Join("; ", highlights);
             var required = r.TryGetProperty("required", out var q) && q.ValueKind == JsonValueKind.True;
-            return version > Current ? new UpdateInfo(version, url, notes, required, highlights) : null;
+            return version > Current ? new UpdateInfo(version, url, notes, required, highlights, sha) : null;
         }
         catch
         {
             return null; // offline or no manifest yet: carry on without updating
         }
+    }
+
+    /// <summary>The new exe may only be fetched over HTTPS from GitHub (where the releases are published).</summary>
+    static bool IsTrustedDownload(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps
+        && (uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.EndsWith(".github.com", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>True when the file looks like a Windows program and, when the manifest gives a hash, matches it.</summary>
+    static bool LooksRight(string path, string? sha256)
+    {
+        using var s = File.OpenRead(path);
+        if (s.Length < 1_000_000 || s.ReadByte() != 'M' || s.ReadByte() != 'Z') return false;     // not an .exe
+        if (string.IsNullOrEmpty(sha256)) return true;
+        s.Position = 0;
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(s)).Equals(sha256, StringComparison.OrdinalIgnoreCase);
     }
 
     // ---- background download ------------------------------------------------------
@@ -131,7 +148,7 @@ public static class Updater
             var marker = fresh + ".ver";
             // already downloaded earlier (for example before a restart)?
             if (File.Exists(fresh) && File.Exists(marker) && File.ReadAllText(marker).Trim() == ver
-                && new FileInfo(fresh).Length > 1_000_000)
+                && LooksRight(fresh, info.Sha256))
             {
                 lastProgress = 1; sink?.Report(1);
                 return true;
@@ -159,7 +176,7 @@ public static class Updater
                 }
             }
 
-            if (new FileInfo(part).Length < 1_000_000)
+            if (!LooksRight(part, info.Sha256))        // truncated, not an exe, or not the file the release says it is
             {
                 File.Delete(part);
                 return false;

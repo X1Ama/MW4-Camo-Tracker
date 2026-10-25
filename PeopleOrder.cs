@@ -3,24 +3,24 @@ using System.Text.Json;
 
 namespace MasteryTracker;
 
-/// <summary>The order the admin panel's people list is shown in, chosen by dragging names. Kept on this PC only.</summary>
+/// <summary>The order a list of people is shown in, chosen by dragging names. One small file per list, kept on this PC only.</summary>
 public static class PeopleOrder
 {
-    static string FilePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MasteryCamoTracker", "people-order.json");
+    static string FilePath(string name) => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MasteryCamoTracker", name + ".json");
 
-    public static List<string> Load()
+    public static List<string> Load(string name = "people-order")
     {
-        try { return JsonSerializer.Deserialize<List<string>>(File.ReadAllText(FilePath)) ?? new(); }
+        try { return JsonSerializer.Deserialize<List<string>>(File.ReadAllText(FilePath(name))) ?? new(); }
         catch { return new(); }
     }
 
-    public static void Save(IEnumerable<string> ids)
+    public static void Save(IEnumerable<string> ids, string name = "people-order")
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(ids));
+            Directory.CreateDirectory(Path.GetDirectoryName(FilePath(name))!);
+            File.WriteAllText(FilePath(name), JsonSerializer.Serialize(ids));
         }
         catch { /* the order is a convenience: losing it is not an error */ }
     }

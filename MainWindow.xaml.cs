@@ -732,14 +732,16 @@ public partial class MainWindow : Window
         }
     }
 
+    DragOrder? clientOrder;
+
     void ApplyClientFilter()
     {
         var q = ClientSearch.Text.Trim();
         var keep = target?.Id;
-        ClientList.ItemsSource = clients
+        clientOrder ??= new DragOrder(ClientList, "clients-order", () => clients, ApplyClientFilter);
+        ClientList.ItemsSource = clientOrder.Sort(clients
             .Where(c => q.Length == 0 || c.Label.Contains(q, StringComparison.OrdinalIgnoreCase)
-                        || c.Email.Contains(q, StringComparison.OrdinalIgnoreCase))
-            .ToList();
+                        || c.Email.Contains(q, StringComparison.OrdinalIgnoreCase)));
         if (keep != null && ClientList.ItemsSource is List<Profile> l)
             ClientList.SelectedItem = l.FirstOrDefault(c => c.Id == keep);
         var renewed = clients.FirstOrDefault(c => c.Id == keep);

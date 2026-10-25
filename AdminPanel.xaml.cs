@@ -72,101 +72,21 @@ public partial class AdminPanel : UserControl
             .Where(p => q.Length == 0 || p.Label.Contains(q, StringComparison.OrdinalIgnoreCase)
                         || p.Email.Contains(q, StringComparison.OrdinalIgnoreCase))
             .ToList();
-        list = Sorted(list);
+        peopleOrder ??= new DragOrder(UserList, "people-order", () => ByRoleThenName(people), ApplyFilter);
+        list = peopleOrder.Sort(ByRoleThenName(list));
         UserList.ItemsSource = list;
         CountText.Text = $"PEOPLE ({people.Count})";
         if (keepId != null) UserList.SelectedItem = list.FirstOrDefault(p => p.Id == keepId);
         ShowDetail();
     }
 
-    /// <summary>Names in the order you dragged them to; anyone not placed yet comes after, owners first, then by name.</summary>
-    readonly List<string> customOrder = PeopleOrder.Load();
+    /// <summary>The people list in the order you dragged the names to (owners first, then by name, until you move someone).</summary>
+    DragOrder? peopleOrder;
 
-    List<Profile> Sorted(IEnumerable<Profile> list) => list
-        .OrderBy(p => { int i = customOrder.IndexOf(p.Id); return i >= 0 ? i : int.MaxValue; })
-        .ThenBy(p => p.Role == "owner" ? 0 : p.Role == "admin" ? 1 : 2)
+    static List<Profile> ByRoleThenName(IEnumerable<Profile> list) => list
+        .OrderBy(p => p.Role == "owner" ? 0 : p.Role == "admin" ? 1 : 2)
         .ThenBy(p => p.Label, StringComparer.OrdinalIgnoreCase)
         .ToList();
-
-    // ---- drag a name to reorder ----------------------------------------------------------
-    Point dragStart;
-    Profile? dragging;
-    ListBoxItem? dropMark;
-
-    static T? Up<T>(DependencyObject? d) where T : DependencyObject
-    {
-        while (d != null && d is not T) d = VisualTreeHelper.GetParent(d);
-        return d as T;
-    }
-
-    void UserList_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-    {
-        dragStart = e.GetPosition(null);
-        dragging = Up<ListBoxItem>(e.OriginalSource as DependencyObject)?.DataContext as Profile;
-    }
-
-    void UserList_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
-    {
-        if (dragging == null || e.LeftButton != System.Windows.Input.MouseButtonState.Pressed) return;
-        var d = e.GetPosition(null) - dragStart;
-        if (Math.Abs(d.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(d.Y) < SystemParameters.MinimumVerticalDragDistance) return;
-        var who = dragging;
-        dragging = null;
-        DragDrop.DoDragDrop(UserList, new DataObject("person", who), DragDropEffects.Move);
-        ClearDropMark();
-    }
-
-    // the name's row has a border inside its template: its top edge becomes the yellow "drop here" line
-    static Border? RowBorder(ListBoxItem item) => item.Template?.FindName("B", item) as Border;
-
-    void ClearDropMark()
-    {
-        if (dropMark != null && RowBorder(dropMark) is Border b)
-        {
-            b.BorderThickness = new Thickness(3, 0, 0, 0);
-            b.ClearValue(Border.BorderBrushProperty);
-            b.BorderBrush = dropMark.IsSelected ? (Brush)Application.Current.Resources["Accent"] : Brushes.Transparent;
-        }
-        dropMark = null;
-    }
-
-    void UserList_DragOver(object sender, DragEventArgs e)
-    {
-        e.Effects = e.Data.GetDataPresent("person") ? DragDropEffects.Move : DragDropEffects.None;
-        e.Handled = true;
-        var item = Up<ListBoxItem>(e.OriginalSource as DependencyObject);
-        if (item == dropMark) return;
-        ClearDropMark();
-        if (item != null && RowBorder(item) is Border b)
-        {
-            // a yellow line above the name it will be placed before
-            b.BorderBrush = (Brush)Application.Current.Resources["Accent"];
-            b.BorderThickness = new Thickness(3, 2, 0, 0);
-            dropMark = item;
-        }
-    }
-
-    void UserList_DragLeave(object sender, DragEventArgs e) => ClearDropMark();
-
-    void UserList_Drop(object sender, DragEventArgs e)
-    {
-        ClearDropMark();
-        if (e.Data.GetData("person") is not Profile moved) return;
-        var targetItem = Up<ListBoxItem>(e.OriginalSource as DependencyObject);
-        var target = targetItem?.DataContext as Profile;
-        if (target?.Id == moved.Id) return;
-        // the whole list in its current order, with the moved name taken out and put before the one it was dropped on
-        var ids = Sorted(people).Select(p => p.Id).ToList();
-        ids.Remove(moved.Id);
-        int at = target == null ? ids.Count : ids.IndexOf(target.Id);
-        ids.Insert(at < 0 ? ids.Count : at, moved.Id);
-        customOrder.Clear();
-        customOrder.AddRange(ids);
-        PeopleOrder.Save(ids);
-        ApplyFilter();
-        e.Handled = true;
-    }
-
     void UserSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilter();
 
     void NewUser_Click(object sender, RoutedEventArgs e)

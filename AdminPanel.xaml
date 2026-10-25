@@ -14,11 +14,8 @@
                            FontSize="18" Foreground="{StaticResource Muted}" Margin="16,16,16,8"/>
                 <Button DockPanel.Dock="Top" Style="{StaticResource Chip}" Content="+ NEW USER" Margin="12,0,12,10" Padding="12,8" FontSize="14" Click="NewUser_Click"/>
                 <TextBox x:Name="UserSearch" DockPanel.Dock="Top" Margin="12,0,12,10" TextChanged="UserSearch_TextChanged"/>
-                <ListBox x:Name="UserList" Background="Transparent" BorderThickness="0" AllowDrop="True"
-                         SelectionChanged="UserList_SelectionChanged"
-                         PreviewMouseLeftButtonDown="UserList_PreviewMouseDown" PreviewMouseMove="UserList_PreviewMouseMove"
-                         DragOver="UserList_DragOver" Drop="UserList_Drop" DragLeave="UserList_DragLeave"
-                         ToolTip="Drag a name to change the order">
+                <ListBox x:Name="UserList" Background="Transparent" BorderThickness="0"
+                         SelectionChanged="UserList_SelectionChanged">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <DockPanel>

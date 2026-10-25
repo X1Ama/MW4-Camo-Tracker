@@ -25,7 +25,8 @@ public partial class MainView : UserControl
     Profile? target;
     ClientData data = new();
     string lastSig = "";
-    string modeId = Catalog.Modes[0].Id;
+    bool needRender = true;      // the screen still shows "Loading…": the next full load must draw, whatever the data looks like
+    string modeId = Catalog.Tabs.First().Id;
     string filter = "all";
     string query = "";
     int inflight;

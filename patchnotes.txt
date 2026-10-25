@@ -1,7 +1,7 @@
-- New guns: Axion, Cronen Squall, Oden, Vel 46, WZ.55 Striga, Warlord, APOC-338, Mosin-Nagant, Astaroth .57, Sang 9mm, Mojave .357, RPG-8, JOKR, PM-40 Anvil and the FSS Carbon Edge 1095, and every gun is now sorted into its proper type
-- New MODE MASTERY tab with the Multiplayer and DMZ mode mastery camos in small groups
-- DMZ tab now has the Completionist camos (Gold, Platinum, Harmonic Break, Divergence) and a SPECIAL group for the Han 86 and Kastov 762
-- Hover over a camo to see its name and challenge
-- Weapons are laid out in a grid that fills the window, with the gun name on a bar
-- RESET TAB always asks first, and the progress percentage is no longer hidden
-- Clearer group labels and smoother button edges
+- Special camos for every gun, with their challenges shown when you hover over a camo
+- Multiplayer and DMZ tabs, each with its own special and completionist camos and requirements
+- Camo pictures on the tiles, and a gun card that takes on the colour of its highest completionist camo
+- Ticking a special or completionist camo also ticks the ones before it
+- Guns sorted in the in-game order, each with its own top weapon level
+- New Prestige camos (Pyroclast, Terminus, Scatter, Cascade) and a Mode Mastery tab
+- Fixed the screen sometimes staying on Loading when picking a client

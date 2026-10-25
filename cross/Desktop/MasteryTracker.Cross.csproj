@@ -11,7 +11,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>MasteryCamoTracker</AssemblyName>
     <RootNamespace>MasteryTracker</RootNamespace>
-    <Version>0.1.23</Version>
+    <Version>0.1.24</Version>
     <ApplicationIcon>..\Core\Assets\app.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>

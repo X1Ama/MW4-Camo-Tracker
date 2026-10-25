@@ -95,6 +95,7 @@ public partial class MainView
         target = null;
         data = new ClientData();
         lastSig = "";
+        needRender = true;
         inflight = 0;
         liveInstant = false;
         pendingUpdate = null;
@@ -102,7 +103,7 @@ public partial class MainView
         query = "";
         SearchBox.Text = "";
         filter = "all";
-        modeId = Catalog.Modes[0].Id;
+        modeId = Catalog.Tabs.First().Id;
         BuildFilters();
         BuildTabs();
 
@@ -230,6 +231,7 @@ public partial class MainView
         target = null;
         data = new ClientData();
         lastSig = "";
+        needRender = true;
         inflight = 0;
 
         ApplyRoleChrome();

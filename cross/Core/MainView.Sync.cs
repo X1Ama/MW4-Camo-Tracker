@@ -130,6 +130,7 @@ public partial class MainView
         realtime?.Watch(p.Id);
         data = new ClientData();
         lastSig = "";
+        needRender = true;
         UpdateTitle();
         TrackerPanel.Children.Clear();       // the real screen is drawn once, when the data has arrived
         cardByKey.Clear();
@@ -242,8 +243,9 @@ public partial class MainView
             if (inflight > 0 || who.Id != target?.Id) return;
             var sig = fresh.Signature();
             if (only == null) lastFullLoad = DateTime.UtcNow;
-            if (sig != lastSig)
+            if (needRender || sig != lastSig)
             {
+                if (only == null) needRender = false;
                 data = fresh;
                 lastSig = sig;
                 Timing.Mark("client data received");

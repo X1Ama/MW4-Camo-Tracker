@@ -17,7 +17,8 @@ public partial class MainWindow : Window
     Profile? target;
     ClientData data = new();
     string lastSig = "";
-    string modeId = Catalog.Modes[0].Id;
+    bool needRender = true;      // the screen still shows "Loading…": the next full load must draw, whatever the data looks like
+    string modeId = Catalog.Tabs.First().Id;
     string filter = "all";
     string query = "";
     int inflight;
@@ -191,6 +192,7 @@ public partial class MainWindow : Window
         target = null;
         data = new ClientData();
         lastSig = "";
+        needRender = true;
         inflight = 0;
         liveInstant = false;
         pendingUpdate = null;
@@ -198,7 +200,7 @@ public partial class MainWindow : Window
         query = "";
         SearchBox.Text = "";
         filter = "all";
-        modeId = Catalog.Modes[0].Id;
+        modeId = Catalog.Tabs.First().Id;
         BuildFilters();
         BuildTabs();
 
@@ -279,7 +281,7 @@ public partial class MainWindow : Window
     void BuildTabs()
     {
         Tabs.Children.Clear();
-        foreach (var m in Catalog.Modes)
+        foreach (var m in Catalog.Tabs)
         {
             var b = new Button
             {
@@ -507,6 +509,7 @@ public partial class MainWindow : Window
         target = null;
         data = new ClientData();
         lastSig = "";
+        needRender = true;
         inflight = 0;
 
         AdminButton.Visibility = me.IsStaff ? Visibility.Visible : Visibility.Collapsed;
@@ -751,6 +754,7 @@ public partial class MainWindow : Window
         realtime?.Watch(p.Id);
         data = new ClientData();
         lastSig = "";
+        needRender = true;
         UpdateTitle();
         TrackerPanel.Children.Clear();       // the real screen is drawn once, when the data has arrived
         cardByKey.Clear();
@@ -856,8 +860,9 @@ public partial class MainWindow : Window
             if (inflight > 0 || who.Id != target?.Id) return;
             var sig = fresh.Signature();
             if (only == null) lastFullLoad = DateTime.UtcNow;
-            if (sig != lastSig)
+            if (needRender || sig != lastSig)
             {
+                if (only == null) needRender = false;
                 data = fresh;
                 lastSig = sig;
                 Timing.Mark("client data received");
@@ -947,16 +952,16 @@ public partial class MainWindow : Window
     List<(string Id, string Label, bool Track)> ChipsFor(Row w, Mode mode)
     {
         var chips = new List<(string Id, string Label, bool Track)>();
-        if (mode.Id == "dmz")      // the DMZ tab holds the special and the completionist camos
+        if (mode.Id is "dmz" or "mp")      // the Multiplayer and DMZ tabs each hold the special and the completionist camos
         {
-            foreach (var c in Catalog.DmzSpecialFor(w.Key)) chips.Add(($"dmzs-{w.Key}-{Catalog.Slug(c)}", c, false));
-            foreach (var c in Catalog.DmzCompletionist) chips.Add(($"dmzc-{w.Key}-{Catalog.Slug(c)}", c, false));
+            foreach (var c in Catalog.DmzSpecialFor(w.Key)) chips.Add(($"{mode.Id}s-{w.Key}-{Catalog.Slug(c)}", c, false));
+            foreach (var c in Catalog.DmzCompletionist) chips.Add(($"{mode.Id}c-{w.Key}-{Catalog.Slug(c)}", c, false));
             return chips;
         }
         if (mode.Track) chips.Add(("track-" + w.Key, "Camo Track", true));
         if (mode.Id == "mm")
         {
-            foreach (var src in Catalog.Modes.Where(m => m.Id is "mp" or "dmz"))
+            foreach (var src in new[] { "mp", "dmz" }.Select(id => Catalog.Modes.First(m => m.Id == id)))
                 foreach (var c in src.Camos) chips.Add(($"{src.Id}-{w.Key}-{Catalog.Slug(c)}", c, false));
             return chips;
         }
@@ -1030,7 +1035,7 @@ public partial class MainWindow : Window
         }
         var who = target.Id == me.Id ? "your progress" : target.Label + "'s progress";
         var body = $"This clears {ids.Count} ticked camo{(ids.Count == 1 ? "" : "s")} in the {mode.Name} tab and sets every weapon level back to 0 ({who}). This cannot be undone."
-            + (mode.Track && mode.Id != "dmz" ? " Camo Track and weapon levels are shared with the other tabs." : " Weapon levels are shared with the other tabs.");
+            + (mode.Track && mode.Id is not ("dmz" or "mp") ? " Camo Track and weapon levels are shared with the other tabs." : " Weapon levels are shared with the other tabs.");
         if (!await resetConfirm.AskAsync($"Reset {mode.Name}?", body, "RESET")) return;
 
         var cid = target.Id;
@@ -1222,16 +1227,111 @@ public partial class MainWindow : Window
                 c.Width = w;
     }
 
+    // ---- camo pictures -------------------------------------------------------------------------
+
+    static readonly Dictionary<string, ImageSource?> camoPictures = new();
+
+    /// <summary>The picture of a camo (Assets/camos/{name}.png), or null when we do not have one.</summary>
+    static ImageSource? CamoPicture(string label)
+    {
+        var key = Catalog.Slug(label);
+        if (camoPictures.TryGetValue(key, out var cached)) return cached;
+        ImageSource? img = null;
+        try
+        {
+            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+            bmp.BeginInit();
+            bmp.UriSource = new Uri($"pack://application:,,,/Assets/camos/{key}.png", UriKind.Absolute);
+            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            bmp.Freeze();
+            img = bmp;
+        }
+        catch { /* no picture for this camo: the tile shows its initials */ }
+        camoPictures[key] = img;
+        return img;
+    }
+
+    static readonly Dictionary<string, Color?> camoHues = new();
+
+    /// <summary>The main colour of a camo's picture (its average, made a little more vivid), or null without a picture.</summary>
+    static Color? CamoHue(string label)
+    {
+        var key = Catalog.Slug(label);
+        if (camoHues.TryGetValue(key, out var cached)) return cached;
+        Color? hue = null;
+        if (CamoPicture(label) is System.Windows.Media.Imaging.BitmapSource src)
+        {
+            try
+            {
+                var bgra = new System.Windows.Media.Imaging.FormatConvertedBitmap(src, PixelFormats.Bgra32, null, 0);
+                int w = bgra.PixelWidth, h = bgra.PixelHeight, stride = w * 4;
+                var px = new byte[h * stride];
+                bgra.CopyPixels(px, stride, 0);
+                long r = 0, g = 0, b = 0; int n = 0;
+                for (int i = 0; i < px.Length; i += 16) { b += px[i]; g += px[i + 1]; r += px[i + 2]; n++; }
+                if (n > 0)
+                {
+                    double R = r / (double)n, G = g / (double)n, B = b / (double)n;
+                    double avg = (R + G + B) / 3;
+                    const double boost = 1.25;          // pull the colour away from grey so the hue reads
+                    byte Clamp(double v) => (byte)Math.Clamp(avg + (v - avg) * boost, 40, 255);
+                    hue = Color.FromRgb(Clamp(R), Clamp(G), Clamp(B));
+                }
+            }
+            catch { }
+        }
+        camoHues[key] = hue;
+        return hue;
+    }
+
+    /// <summary>What a camo tile shows: its picture (dimmed with a tick when done), or its initials.</summary>
+    static UIElement TileContent(string label, bool on)
+    {
+        var pic = CamoPicture(label);
+        if (pic == null)
+            return new TextBlock
+            {
+                Text = on ? "\u2713" : Initials(label),
+                FontFamily = Mono,
+                FontSize = on ? 15 : 12,
+                FontWeight = FontWeights.SemiBold,
+            };
+        var grid = new Grid { UseLayoutRounding = true };
+        // round the picture's corners to match the tile, so it does not poke out past the curved border
+        grid.SizeChanged += (_, e) => grid.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 5, 5);
+        var image = new Image { Source = pic, Stretch = Stretch.UniformToFill, SnapsToDevicePixels = true };   // pixel-aligned, so it is not re-blurred
+        RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+        grid.Children.Add(image);
+        if (on)
+        {
+            grid.Children.Add(new Border { Background = new SolidColorBrush(Color.FromArgb(120, 0, 0, 0)) });
+            grid.Children.Add(new TextBlock
+            {
+                Text = "\u2713",
+                FontFamily = Mono,
+                FontSize = 18,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+        }
+        return grid;
+    }
+
     static string Initials(string label) => label switch
     {
         "Smoke" => "SM",            // Smoke and Stormwave would both be "S"
         "Stormwave" => "SW",
+        "Ghast" => "GH",            // Ghast and Gunmetal would both be "G"
+        "Gunmetal" => "GM",
         _ => string.Concat(label.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(p => char.ToUpperInvariant(p[0]))),
     };
 
     /// <summary>The Mode Mastery tab shows its camos in small groups per mode; every other tab is one group.</summary>
     IEnumerable<IGrouping<string, (string Id, string Label, bool Track)>> ChipGroups(List<(string Id, string Label, bool Track)> chips) =>
-        chips.GroupBy(c => modeId == "dmz" ? (c.Id.StartsWith("dmzs-") ? "SPECIAL" : "COMPLETIONIST")
+        chips.GroupBy(c => modeId is "dmz" or "mp" ? (c.Id.StartsWith(modeId + "s-") ? "SPECIAL" : "COMPLETIONIST")
             : modeId != "mm" ? "" : c.Id.StartsWith("dmz-") ? "DMZ" : c.Id.StartsWith("mp-") ? "MULTIPLAYER" : "");
 
     /// <summary>One weapon as a card: its name and level on top, a strip of camo tiles underneath.</summary>
@@ -1339,13 +1439,7 @@ public partial class MainWindow : Window
             var b = new Button
             {
                 Style = (Style)FindResource("Chip"),
-                Content = new TextBlock
-                {
-                    Text = on ? "\u2713" : Initials(c.Label),
-                    FontFamily = Mono,
-                    FontSize = on ? 15 : 12,
-                    FontWeight = FontWeights.SemiBold,
-                },
+                Content = TileContent(c.Label, on),
                 Height = 38,
                 Padding = new Thickness(0),
                 Margin = new Thickness(0, 0, 4, 0),
@@ -1353,17 +1447,30 @@ public partial class MainWindow : Window
                 Background = on ? Res("Accent") : Res("Panel2"),
                 Foreground = on ? Res("AccentFg") : Res("Fg"),
                 BorderBrush = on ? Res("Accent") : Res("Line"),
-                ToolTip = CenteredTip(c.Label, Catalog.Challenge(c.Label, w.Cls, w.Name)),
+                ToolTip = CenteredTip(c.Label, Catalog.Challenge(c.Label, w.Cls, w.Name, modeId)),
                 IsHitTestVisible = CanEdit,
             };
+            // a ticked camo takes on the colour of its picture (gold stays gold, platinum silver, ...)
+            if (on && CamoHue(c.Label) is Color hue)
+            {
+                b.Background = new SolidColorBrush(Color.FromRgb((byte)(hue.R * 0.45), (byte)(hue.G * 0.45), (byte)(hue.B * 0.45)));
+                b.BorderBrush = new SolidColorBrush(hue);
+            }
             var cid = c.Id;
+            // special and completionist camos build on each other: ticking one also ticks the ones before it
+            var earlier = cid.StartsWith(modeId + "c-") ? chips.TakeWhile(x => x.Id != cid).Select(x => x.Id).ToList()      // completionist: all the specials and the completionist camos before it
+                                : cid.StartsWith(modeId + "s-") ? grp.TakeWhile(x => x.Id != cid).Select(x => x.Id).ToList()       // special: the specials before it
+                : new List<string>();
             b.Click += (_, _) =>
             {
                 bool now = !data.Ticks.Contains(cid);
+                var also = now ? earlier.Where(id => !data.Ticks.Contains(id)).ToList() : new List<string>();
                 Mutate(
-                    () => { if (now) data.Ticks.Add(cid); else data.Ticks.Remove(cid); },
-                    () => { if (now) data.Ticks.Remove(cid); else data.Ticks.Add(cid); },
-                    () => api.SetTickAsync(target!.Id, cid, now),
+                    () => { if (now) { data.Ticks.Add(cid); foreach (var id in also) data.Ticks.Add(id); } else data.Ticks.Remove(cid); },
+                    () => { if (now) { data.Ticks.Remove(cid); foreach (var id in also) data.Ticks.Remove(id); } else data.Ticks.Add(cid); },
+                    () => also.Count > 0
+                        ? api.RestoreAsync(target!.Id, also.Append(cid).ToList(), new Dictionary<string, int>())
+                        : api.SetTickAsync(target!.Id, cid, now),
                     w.Key);
             };
             strip.Children.Add(b);
@@ -1372,13 +1479,22 @@ public partial class MainWindow : Window
         }
 
         var card = Panel(body, all ? Res("Accent") : null);
+        // the card takes on the colour of the highest completionist camo that is ticked (gold card for Gold, silver for Platinum, ...)
+        var topDone = chips.LastOrDefault(c => c.Id.Contains("c-") && (c.Id.StartsWith("mpc-") || c.Id.StartsWith("dmzc-")) && data.Ticks.Contains(c.Id));
+        if (topDone.Id != null && CamoHue(topDone.Label) is Color tint)
+        {
+            static Color Mix(Color c, double k) => Color.FromRgb((byte)(c.R * k + 22 * (1 - k)), (byte)(c.G * k + 25 * (1 - k)), (byte)(c.B * k + 27 * (1 - k)));
+            card.Background = new LinearGradientBrush(Mix(tint, 0.62), Mix(tint, 0.20), 55);      // strong in the corner, still tinted at the far end
+            card.BorderBrush = new SolidColorBrush(tint);
+            card.BorderThickness = new Thickness(1.5);
+        }
         card.Width = cardW;
         card.Margin = new Thickness(0, 10, 10, 0);
         return card;
     }
     UIElement BuildLevel(Row w)
     {
-        int lv = Math.Min(Catalog.MaxLevel, data.Levels.GetValueOrDefault(w.Key, 0));
+        int lv = Math.Min(Catalog.MaxLevelFor(w.Key), data.Levels.GetValueOrDefault(w.Key, 0));
         var g = new Grid { Margin = new Thickness(0, 8, 0, 0) };
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -1401,7 +1517,7 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Left,
         };
         track.Children.Add(fill);
-        track.SizeChanged += (_, _) => fill.Width = track.ActualWidth * lv / Catalog.MaxLevel;
+        track.SizeChanged += (_, _) => fill.Width = track.ActualWidth * lv / Catalog.MaxLevelFor(w.Key);
         var trackBox = new Border { BorderBrush = Res("Line"), BorderThickness = new Thickness(1), Child = track, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(5), Padding = new Thickness(1) };
         Grid.SetColumn(trackBox, 1);
         g.Children.Add(trackBox);
@@ -1410,7 +1526,7 @@ public partial class MainWindow : Window
         {
             void SetLevel(int v)
             {
-                v = Math.Clamp(v, 0, Catalog.MaxLevel);
+                v = Math.Clamp(v, 0, Catalog.MaxLevelFor(w.Key));
                 int old = data.Levels.GetValueOrDefault(w.Key, 0);
                 if (v == old) return;
                 Mutate(
@@ -1441,7 +1557,7 @@ public partial class MainWindow : Window
                 Padding = new Thickness(2, 0, 2, 0),
                 VerticalContentAlignment = VerticalAlignment.Center,
                 HorizontalContentAlignment = HorizontalAlignment.Center,
-                ToolTip = $"Type a level from 0 to {Catalog.MaxLevel}",
+                ToolTip = $"Type a level from 0 to {Catalog.MaxLevelFor(w.Key)}",
             };
             input.PreviewTextInput += (_, e) => e.Handled = !e.Text.All(char.IsAsciiDigit);
             DataObject.AddPastingHandler(input, (_, e) =>
@@ -1452,7 +1568,7 @@ public partial class MainWindow : Window
             void CommitLevel()
             {
                 if (int.TryParse(input.Text, out var typed)) SetLevel(typed);
-                input.Text = Math.Min(Catalog.MaxLevel, data.Levels.GetValueOrDefault(w.Key, 0)).ToString();
+                input.Text = Math.Min(Catalog.MaxLevelFor(w.Key), data.Levels.GetValueOrDefault(w.Key, 0)).ToString();
             }
             input.KeyDown += (_, e) =>
             {
@@ -1468,10 +1584,10 @@ public partial class MainWindow : Window
             // press and drag along the bar to scrub the level; it is saved once, when the mouse is let go
             bool scrubbing = false;
             int LevelAt(MouseEventArgs e) =>
-                Math.Clamp((int)Math.Round(e.GetPosition(track).X / Math.Max(1, track.ActualWidth) * Catalog.MaxLevel), 0, Catalog.MaxLevel);
+                Math.Clamp((int)Math.Round(e.GetPosition(track).X / Math.Max(1, track.ActualWidth) * Catalog.MaxLevelFor(w.Key)), 0, Catalog.MaxLevelFor(w.Key));
             void Preview(int v)
             {
-                fill.Width = track.ActualWidth * v / Catalog.MaxLevel;
+                fill.Width = track.ActualWidth * v / Catalog.MaxLevelFor(w.Key);
                 input.Text = v.ToString();
             }
             track.MouseLeftButtonDown += (_, e) =>
